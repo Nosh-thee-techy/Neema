@@ -21,6 +21,8 @@ import { EpdsPage } from '../pages/EpdsPage';
 import { SignOffPage } from '../pages/SignOffPage';
 import { SignSessionPage } from '../pages/SignSessionPage';
 import { TalkModePage } from '../pages/TalkModePage';
+import { CareChatPage } from '../pages/CareChatPage';
+import { TodoPage } from '../pages/TodoPage';
 import { LocaleProvider } from '../hooks/useLocale';
 import { LandingPage } from '../pages/LandingPage';
 
@@ -45,6 +47,22 @@ export function AppRouter() {
               element={
                 <RequireAuth>
                   <TalkModePage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/care"
+              element={
+                <RequireAuth>
+                  <CareChatPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/todo"
+              element={
+                <RequireAuth>
+                  <TodoPage />
                 </RequireAuth>
               }
             />

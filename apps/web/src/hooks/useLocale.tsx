@@ -162,6 +162,12 @@ const COPY: Dict = {
     sw: 'Faragha kwenye simu — si rangi ya tahadhari',
   },
   birth_plan_row: { en: 'Birth preparedness', sw: 'Maandalizi ya kuzaliwa' },
+  todo_nav: { en: 'Today', sw: 'Leo' },
+  todo_all_done: { en: 'Everything for today is done', sw: 'Mambo yote ya leo yamekamilika' },
+  todo_nudge_title: { en: 'Your care list', sw: 'Orodha yako ya leo' },
+  todo_nudge_open: { en: 'Open today’s list', sw: 'Fungua orodha ya leo' },
+  todo_left: { en: 'left to do', sw: 'bado kufanywa' },
+  talk_nav: { en: 'Talk', sw: 'Ongea' },
 };
 
 interface LocaleState {
