@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FALLBACK_ORDER, planSignOrder } from './signPlanServer.mjs';
+import { planCareChat } from './careChatServer.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.join(__dirname, 'dist');
@@ -163,6 +164,26 @@ const server = http.createServer((req, res) => {
   }
   if (req.method === 'POST' && pathOnly === '/api/sign-plan') {
     void handleSignPlan(req, res);
+    return;
+  }
+  if (req.method === 'POST' && pathOnly === '/api/care-chat') {
+    void (async () => {
+      try {
+        const raw = await readBody(req);
+        const body = JSON.parse(raw || '{}');
+        const result = await planCareChat({
+          apiKey: LLM_KEY,
+          baseUrl: LLM_BASE,
+          model: LLM_MODEL,
+          body,
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch {
+        res.writeHead(502, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Care chat could not be reached.' }));
+      }
+    })();
     return;
   }
   if (req.method === 'GET' || req.method === 'HEAD') {

@@ -22,5 +22,7 @@ ENV PORT=8080
 COPY --from=build /repo/apps/web/dist ./dist
 COPY apps/web/server.mjs ./server.mjs
 COPY apps/web/signPlanServer.mjs ./signPlanServer.mjs
+COPY apps/web/careChatServer.mjs ./careChatServer.mjs
+COPY packages/core/src/careCards.who.json ./careCards.who.json
 EXPOSE 8080
 CMD ["node", "server.mjs"]

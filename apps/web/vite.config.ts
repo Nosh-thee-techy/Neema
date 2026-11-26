@@ -3,10 +3,11 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import { msingiTtsPlugin } from './src/vite/msingiPlugin.js';
 import { signPlanPlugin } from './src/vite/signPlanPlugin.js';
+import { careChatPlugin } from './src/vite/careChatPlugin.js';
 
 export default defineConfig({
   envDir: path.resolve(__dirname),
-  plugins: [react(), msingiTtsPlugin(), signPlanPlugin()],
+  plugins: [react(), msingiTtsPlugin(), signPlanPlugin(), careChatPlugin()],
   resolve: {
     alias: {
       '@neema/core': path.resolve(__dirname, '../../packages/core/src/index.ts'),
