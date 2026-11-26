@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import type { BpReading } from '@neema/core';
 import { loadProfile } from '../services/passport';
+import { contactReadiness } from '../services/contacts';
 import { db } from '../storage/db';
 
 export interface TodaySnapshot {
@@ -15,6 +16,9 @@ export interface TodaySnapshot {
   bpToday: boolean;
   lastSymptomTsMs: number | null;
   symptomsToday: boolean;
+  /** null until loaded; false means alerts have no real CHP to go to. */
+  hasRealChp: boolean | null;
+  placeholderContacts: number;
 }
 
 const EMPTY: TodaySnapshot = {
@@ -24,6 +28,8 @@ const EMPTY: TodaySnapshot = {
   bpToday: false,
   lastSymptomTsMs: null,
   symptomsToday: false,
+  hasRealChp: null,
+  placeholderContacts: 0,
 };
 
 function startOfLocalDay(nowMs: number): number {
@@ -43,10 +49,11 @@ export function useToday(refreshKey: unknown): TodaySnapshot {
     let cancelled = false;
     void (async () => {
       const dayStart = startOfLocalDay(Date.now());
-      const [profile, lastBp, lastSymptom] = await Promise.all([
+      const [profile, lastBp, lastSymptom, contacts] = await Promise.all([
         loadProfile().catch(() => null),
         db.bp.orderBy('tsMs').last(),
         db.symptoms.orderBy('tsMs').last(),
+        contactReadiness(),
       ]);
       if (cancelled) return;
       const pregnant = profile?.stage === 'pregnancy';
@@ -57,6 +64,8 @@ export function useToday(refreshKey: unknown): TodaySnapshot {
         bpToday: Boolean(lastBp && lastBp.tsMs >= dayStart),
         lastSymptomTsMs: lastSymptom?.tsMs ?? null,
         symptomsToday: Boolean(lastSymptom && lastSymptom.tsMs >= dayStart),
+        hasRealChp: contacts.hasRealChp,
+        placeholderContacts: contacts.placeholders.length,
       });
     })();
     return () => {

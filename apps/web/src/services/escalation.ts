@@ -1,24 +1,20 @@
 /**
  * Escalation timer for unacknowledged RED alerts.
- * After each interval, exposes the next contact so the UI can open another sms: link.
- * Placeholders: 5 minutes → next contact, 10 minutes → supervisor (project doc).
+ * Uses the pure plan from @neema/core: after 5 minutes the next contact, after 10 minutes
+ * the CHP supervisor. Each due step hands the UI a contact so it can offer a new SMS
+ * and sound an alarm (a web app cannot send SMS silently).
  */
 
-import type { Contact } from '@neema/core';
+import {
+  FIELD_ESCALATION,
+  dueEscalationSteps,
+  planEscalation,
+  type Contact,
+  type EscalationStepPlan,
+  type EscalationTiming,
+} from '@neema/core';
 import { acknowledgeRed } from './alerts';
 import { db } from '../storage/db';
-
-export interface EscalationConfig {
-  /** ms before notifying the next contact (default 5 min). */
-  nextContactAfterMs: number;
-  /** ms before notifying supervisor role (default 10 min). */
-  supervisorAfterMs: number;
-}
-
-export const DEFAULT_ESCALATION: EscalationConfig = {
-  nextContactAfterMs: 5 * 60_000,
-  supervisorAfterMs: 10 * 60_000,
-};
 
 export type EscalationStep =
   | { kind: 'idle' }
@@ -27,68 +23,50 @@ export type EscalationStep =
   | { kind: 'exhausted' };
 
 export interface EscalationHandle {
-  /** Poll current step; safe to call from a UI interval. */
+  /** Poll the next due step; safe to call every second from the UI. One step per call. */
   tick(nowMs?: number): Promise<EscalationStep>;
+  /** When the next step is due, or null when nothing is left. */
+  nextDueAtMs(): number | null;
   /** Stop timers without acknowledging the alert. */
   stop(): void;
 }
 
 /**
- * Starts escalation for an alert id using contacts sorted by escalationOrder.
- * First contact is assumed already offered at raise time; this advances further.
+ * Starts escalation for a RED alert.
+ * `alreadyOfferedIds` are the contacts who got an SMS when the alert was raised.
+ * `startedAtMs` is the alert's own time, so escalation resumes correctly after a reload.
  */
 export function startEscalation(
   alertId: string,
   contacts: Contact[],
-  config: EscalationConfig = DEFAULT_ESCALATION,
+  alreadyOfferedIds: string[] = [],
+  timing: EscalationTiming = FIELD_ESCALATION,
   startedAtMs: number = Date.now(),
 ): EscalationHandle {
-  const ordered = [...contacts].sort((a, b) => a.escalationOrder - b.escalationOrder);
+  const plan: EscalationStepPlan[] = planEscalation(contacts, alreadyOfferedIds, timing);
+  const fired: string[] = [];
   let stopped = false;
-  let emittedNext = false;
-  let emittedSupervisor = false;
 
   return {
     async tick(nowMs: number = Date.now()): Promise<EscalationStep> {
       if (stopped) return { kind: 'idle' };
-
       const alert = await db.alerts.get(alertId);
-      if (!alert) return { kind: 'idle' };
+      if (!alert || alert.level !== 'RED') return { kind: 'idle' };
       if (alert.acknowledgedAtMs !== undefined) {
         stopped = true;
         return { kind: 'acknowledged' };
       }
-      if (alert.level !== 'RED') return { kind: 'idle' };
-
-      const elapsed = nowMs - startedAtMs;
-      const supervisor = ordered.find((c) => c.role === 'supervisor');
-      const nextNonFirst = ordered.slice(1).find((c) => c.role !== 'supervisor') ?? ordered[1];
-
-      if (elapsed >= config.supervisorAfterMs && supervisor && !emittedSupervisor) {
-        emittedSupervisor = true;
-        return {
-          kind: 'notify',
-          contact: supervisor,
-          dueAtMs: startedAtMs + config.supervisorAfterMs,
-          label: 'supervisor',
-        };
+      const [step] = dueEscalationSteps(plan, nowMs - startedAtMs, fired);
+      if (step) {
+        fired.push(step.contact.id);
+        return { kind: 'notify', contact: step.contact, dueAtMs: startedAtMs + step.afterMs, label: step.label };
       }
-
-      if (elapsed >= config.nextContactAfterMs && nextNonFirst && !emittedNext) {
-        emittedNext = true;
-        return {
-          kind: 'notify',
-          contact: nextNonFirst,
-          dueAtMs: startedAtMs + config.nextContactAfterMs,
-          label: 'next',
-        };
-      }
-
-      if (emittedNext && (emittedSupervisor || !supervisor)) {
-        return { kind: 'exhausted' };
-      }
-
-      return { kind: 'idle' };
+      return fired.length === plan.length ? { kind: 'exhausted' } : { kind: 'idle' };
+    },
+    nextDueAtMs() {
+      if (stopped) return null;
+      const next = plan.find((s) => !fired.includes(s.contact.id));
+      return next ? startedAtMs + next.afterMs : null;
     },
     stop() {
       stopped = true;

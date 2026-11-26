@@ -1,7 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { BottomNav } from '../ui/BottomNav';
 
-const HIDE_NAV = new Set(['/', '/orient', '/consent', '/unlock', '/alert']);
+const HIDE_NAV = new Set(['/start', '/orient', '/consent', '/unlock', '/alert']);
 
 /** Shell with optional navigation (bottom bar on phones, side rail on laptops). */
 export function AppLayout() {

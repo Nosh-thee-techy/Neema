@@ -21,16 +21,21 @@ import { EpdsPage } from '../pages/EpdsPage';
 import { SignOffPage } from '../pages/SignOffPage';
 import { SignSessionPage } from '../pages/SignSessionPage';
 import { LocaleProvider } from '../hooks/useLocale';
+import { LandingPage } from '../pages/LandingPage';
 
-/** Mother-facing routes. No marketing landing — entry routes into care. */
+/**
+ * Routes. "/" is the public band page; the installed app opens at /home (manifest start_url)
+ * and the care entry flow lives at /start, so a mother never has to pass the product page.
+ */
 export function AppRouter() {
   return (
     <BrowserRouter>
       <LocaleProvider>
       <GuardianProvider>
         <Routes>
+          <Route path="/" element={<LandingPage />} />
           <Route element={<AppLayout />}>
-            <Route path="/" element={<EntryPage />} />
+            <Route path="/start" element={<EntryPage />} />
             <Route path="/orient" element={<OrientationPage />} />
             <Route path="/consent" element={<ConsentPage />} />
             <Route path="/unlock" element={<UnlockPage />} />
@@ -146,7 +151,7 @@ export function AppRouter() {
                 </RequireAuth>
               }
             />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<Navigate to="/start" replace />} />
           </Route>
         </Routes>
       </GuardianProvider>

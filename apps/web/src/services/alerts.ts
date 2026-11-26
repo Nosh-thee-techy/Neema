@@ -43,9 +43,12 @@ export function firstRecipients(level: AlertDraft['level'], contacts: Contact[])
   return [chp, family].filter((c): c is Contact => c !== undefined);
 }
 
-/** Builds an sms: URI for the prototype (user taps send). */
-export function buildSmsLink(phone: string, body: string): string {
-  const normalized = phone.replace(/\s+/g, '');
+/**
+ * Builds an sms: URI for the prototype (user taps send).
+ * With no phone it opens the SMS app with only the text, so she can pick who to send it to.
+ */
+export function buildSmsLink(phone: string | null, body: string): string {
+  const normalized = (phone ?? '').replace(/\s+/g, '');
   return `sms:${normalized}?&body=${encodeURIComponent(body)}`;
 }
 
@@ -78,6 +81,7 @@ export async function raiseAlert(
     level: draft.level,
     firedRules: draft.firedRules,
     reasons: [...draft.reasons],
+    smsBody: body,
     notified: [],
   };
   await db.alerts.put(alert);

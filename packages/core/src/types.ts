@@ -211,6 +211,8 @@ export interface AlertRecord {
   firedRules: RuleId[];
   /** Reason codes from the triage result, so a sticky RED can still explain itself. */
   reasons?: string[];
+  /** The SMS text prepared for this alert, kept on the phone so escalation can resend it. */
+  smsBody?: string;
   notified: { contactId: string; method: 'sms_link'; atMs: number }[];
   /** RED stays active until this is set. */
   acknowledgedAtMs?: number;

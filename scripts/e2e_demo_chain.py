@@ -4,6 +4,7 @@ Usage: pnpm dev, then  python3 scripts/e2e_demo_chain.py [http://localhost:5173]
 Needs: pip install playwright && playwright install chromium (or set CHROME_PATH).
 """
 import os, sys
+from urllib.parse import unquote
 from playwright.sync_api import sync_playwright
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:5173"
@@ -48,8 +49,49 @@ with sync_playwright() as p:
     page = ctx.new_page()
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
+
+    # Public band page: renders, and its main button leads into the app
+    page.goto(f"{BASE}/")
+    page.wait_for_timeout(1200)
+    check("Landing page shows the band", page.locator(".lp-hero .lp-band").count() == 1 and page.locator("h1.lp-display").count() == 1)
+    page.locator(".lp-hero .lp-pill--dark").first.click()
+    page.wait_for_timeout(1500)
+    check("Landing CTA opens the app", "/home" in page.url or "/unlock" in page.url or "/contacts" in page.url, page.url)
     page.goto(f"{BASE}/home")
     page.wait_for_timeout(1500)
+
+    # No CHP saved: home warns, and an alert falls back to "choose who to text"
+    check("Home warns when no CHP number is saved", page.get_by_test_id("no-chp-warning").count() == 1)
+    play(page, "C · Dharura")
+    page.wait_for_url("**/alert")
+    page.wait_for_timeout(1500)
+    fallback = page.get_by_test_id("no-contacts")
+    check("No contacts → fallback instead of fake numbers", fallback.count() == 1 and page.locator(".sms-list a").count() == 0)
+    href = fallback.locator("a").first.get_attribute("href") or ""
+    check("Fallback SMS has no recipient but has the text", href.startswith("sms:?") and "NEEMA" in unquote(href), href[:40])
+
+    # Contacts: validation, then CHP, two family members, supervisor
+    page.goto(f"{BASE}/contacts")
+    page.wait_for_timeout(800)
+    def add_contact(name, phone, role):
+        page.fill("#cname", name)
+        page.fill("#cphone", phone)
+        page.select_option("#crole", role)
+        page.get_by_role("button", name="Hifadhi").click()
+        page.wait_for_timeout(500)
+    add_contact("Wanjiku", "12345", "chp")
+    check("Invalid phone is rejected", page.locator(".field-error").count() == 1)
+    add_contact("Wanjiku", "+254 700 000 000", "chp")
+    check("Placeholder phone is rejected", page.locator(".field-error").count() == 1)
+    add_contact("Wanjiku", "0712 345 678", "chp")
+    add_contact("Juma", "0722123456", "family")
+    add_contact("Achieng", "0733 987 654", "family")
+    add_contact("Otieno", "0110 222 333", "supervisor")
+    listing = page.get_by_test_id("contact-list").inner_text()
+    check("Numbers saved in +254 form", "+254712345678" in listing and "+254110222333" in listing, listing.replace("\n", " | ")[:200])
+    page.goto(f"{BASE}/home")
+    page.wait_for_timeout(1200)
+    check("Home warning gone once a CHP is saved", page.get_by_test_id("no-chp-warning").count() == 0)
 
     # Scenario C: emergency
     play(page, "C · Dharura")
@@ -60,8 +102,8 @@ with sync_playwright() as p:
     check("C reason in plain Swahili", "shinikizo la damu juu sana" in reason, reason)
     sms_buttons = page.locator(".sms-list a")
     check("C SMS to CHP and family (2 links)", sms_buttons.count() == 2, str(sms_buttons.count()))
+    check("C shows escalation countdown", page.get_by_test_id("escalation-countdown").count() == 1)
     href = sms_buttons.first.get_attribute("href") or ""
-    from urllib.parse import unquote
     body = unquote(href)
     check("C SMS body has plain reason + location", "shinikizo la damu juu sana" in body and "mlat" in body and "bp_" not in body, body[:160])
     spoken = page.evaluate("window.__spoken")
@@ -71,13 +113,28 @@ with sync_playwright() as p:
     page.wait_for_timeout(7000)
     check("C scripted CHP reply 'Nakuja'", page.locator(".chp-reply").count() == 1 and "Nakuja" in page.locator(".chp-reply").inner_text())
     page.screenshot(path=f"{SHOTS}/c_reply.png", full_page=True)
+    # Reload mid-alert: RED, SMS buttons and escalation survive
+    page.reload()
+    page.wait_for_timeout(2500)
+    check("Reload keeps RED", level_on_alert(page) == "RED", level_on_alert(page))
+    check("Reload keeps both SMS buttons", page.locator(".sms-list a").count() == 2, str(page.locator(".sms-list a").count()))
+    # Demo escalation: next contact after 30 s
+    page.get_by_test_id("escalation-notice").wait_for(timeout=40_000)
+    names = page.locator(".sms-list a").all_inner_texts()
+    check("Escalation adds an SMS for the next contact (Achieng)", len(names) == 3 and "Achieng" in names[2], " / ".join(names))
+    esc_href = unquote(page.locator(".sms-list a").nth(2).get_attribute("href") or "")
+    check("Escalation SMS goes to her number with the same text", esc_href.startswith("sms:+254733987654") and "shinikizo la damu juu sana" in esc_href, esc_href[:60])
+    page.screenshot(path=f"{SHOTS}/c_escalated.png", full_page=True)
     n_before = alerts_count(page)
     page.get_by_text("CHP wangu amejibu").click()
     page.wait_for_url("**/home")
     page.wait_for_timeout(4000)
     n_after = alerts_count(page)
     check("C ack does not re-raise a new alert", n_after == n_before, f"{n_before}->{n_after}")
-    check("C home after ack shows confirmed RED action", page.get_by_text("Ona hatua", exact=True).count() >= 1)
+    action = page.locator(".hero-card__action")
+    check("C home after ack offers a next step, not a new alert",
+          page.locator(".hero-card").get_attribute("data-level") == "RED" and action.count() == 1 and "SMS" not in action.inner_text(),
+          action.inner_text() if action.count() else "none")
 
     # Scenario D: postpartum fever + fast pulse
     play(page, "D · Homa")

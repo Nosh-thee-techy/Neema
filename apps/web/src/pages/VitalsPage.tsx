@@ -5,6 +5,7 @@ import { BrandMark } from '../ui/BrandMark';
 import { Button } from '../ui/Button';
 import { LoadingScreen } from '../ui/LoadingScreen';
 import { ErrorScreen } from '../ui/ErrorScreen';
+import { BandArt } from '../ui/BandArt';
 
 /** Live band presence — human states, not BLE jargon. */
 export function VitalsPage() {
@@ -37,6 +38,10 @@ export function VitalsPage() {
         {lang === 'sw' ? 'Bendi yako' : 'Your band'}
       </h1>
       <p className="screen-sub">{presence}</p>
+
+      <div className="band-hero" data-connected={g.connected}>
+        <BandArt className="band-hero__art" compact />
+      </div>
 
       <div className="metric-row">
         <div className="panel metric">

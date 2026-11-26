@@ -1,0 +1,19 @@
+/* Styles for CHP alerting (escalation notice, contact warnings, form errors).
+   Kept out of app.css so feature branches do not collide at its end. */
+
+.escalation-notice {
+  border-color: rgba(216, 52, 82, 0.55);
+  background: rgba(216, 52, 82, 0.1);
+  animation: heartbeat 1.6s ease-in-out infinite;
+}
+
+.contact-warning {
+  border-color: rgba(247, 169, 59, 0.6);
+  background: rgba(255, 210, 122, 0.22);
+}
+
+.field-error {
+  color: var(--danger-deep);
+  font-size: 0.85rem;
+  margin-top: 0.3rem;
+}

@@ -146,3 +146,14 @@ export {
   type TrendResult,
   type TrendSignal,
 } from './trend.js';
+
+export { isPlaceholderPhone, normalizePhone } from './phone.js';
+
+export {
+  DEMO_ESCALATION,
+  FIELD_ESCALATION,
+  dueEscalationSteps,
+  planEscalation,
+  type EscalationStepPlan,
+  type EscalationTiming,
+} from './escalation.js';

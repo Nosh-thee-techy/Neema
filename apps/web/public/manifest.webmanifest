@@ -1,12 +1,12 @@
 {
   "name": "Neema",
   "short_name": "Neema",
-  "description": "Offline maternal guardian — decision support on this phone.",
+  "description": "Offline maternal guardian \u2014 decision support on this phone.",
   "start_url": "/home",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#F4F3FD",
-  "theme_color": "#F4F3FD",
+  "background_color": "#F4F1EB",
+  "theme_color": "#F4F1EB",
   "lang": "sw",
   "icons": [
     {

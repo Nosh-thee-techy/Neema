@@ -29,3 +29,19 @@ SpO2, motion, speech recognition, cloud DB, analytics, silent SMS, diagnosis wor
 11. **Who may clear RED** — `acknowledgeRed(id, at, by)` with `by` = `chp_replied` | `mother_on_the_way` | `clinician_cleared`. After acknowledgement the same evidence doesn't raise a new alert for 30 minutes; a new rule (e.g. SOS) does.
 12. **Contract change** — `AlertRecord` gains optional `reasons` and `acknowledgedBy`; `triage.config.json` gains `vitalsStaleMinutes`.
 13. **Stage demo player** — Settings → Stage demo seeds scenarios A, B1, B2, C, D from `DEMO_SCENARIOS` into IndexedDB and runs the real chain. It is hidden once the app is field-ready. In demo mode the CHP "replies" (scripted, labelled as such) 6 s after the mother opens the CHP SMS.
+
+## CHP alerting (fix/demo-chain, part 2)
+
+14. **No invented contacts** — the alert chain no longer creates demo contacts with placeholder numbers. Contacts with fake-looking numbers (`isPlaceholderPhone`) are never used for alerts. With no usable contact, the alert screen offers "choose who to text" (an `sms:` link with the text and no recipient) and a shortcut to add a CHP.
+15. **Phone numbers are validated** — `normalizePhone` stores Kenyan numbers as +254… and rejects anything that can't be a mobile number. Field readiness now also requires a real CHP number.
+16. **Contacts in setup** — after the first PIN, the app asks for the CHP (required to continue, or "Later") and suggests a family member. Home shows a warning while no real CHP number is saved.
+17. **Escalation is real** — `planEscalation` (core) picks the next contact not yet texted at 5 minutes and the CHP supervisor at 10 minutes. Each step adds an SMS button for that person, sounds a Web Audio alarm, vibrates the phone and the band, and shows "No one has confirmed yet". A countdown shows when the next step is due. In the stage demo the timing is 30 s / 60 s.
+18. **Alerts survive reloads** — `AlertRecord.smsBody` keeps the prepared text on the phone, so after a reload the SMS buttons, which ones were opened, and the escalation timer (counted from the alert's own time) are restored.
+
+## Linen & night redesign (redesign/oura-style)
+
+19. **Look, not brand** — the visual language follows premium wearable sites (warm off-white, deep navy, light serif headlines, pill buttons, hairline cards), but every name, mark, illustration and line of copy is Neema's own. No third-party logos, product photos or text.
+20. **Public band page at `/`** — `LandingPage` (hero with the drawn band, feature strip, band + phone, four cards, how it works with the GREEN/YELLOW/RED/UNKNOWN legend, honest-claims section, footer disclaimer). The care entry flow moved to `/start`; the installed app still opens at `/home` (manifest `start_url`), and the page redirects to `/start` when opened as the installed app. Copy follows the doc's "say / do not say" table: "all raw data stays on the phone", "decision support, not a diagnosis", "prototype sensors, validation planned". Swahili copy is a draft.
+21. **Theme in its own file** — `styles/theme-linen.css` loads after `app.css` and only overrides the look, so feature work in `app.css` keeps merging cleanly. Display font: Instrument Serif (OFL), self-hosted via `@fontsource/instrument-serif` so it works offline.
+22. **Status stays the hero** — the home card is a night-navy card with a thin status ring (amber card for YELLOW, crimson for RED, dashed outline for UNKNOWN); the alert screen is a dark disc inside a coloured ring. No invented 0–100 scores.
+23. **The band on the Band screen** — `ui/BandArt.tsx` (shared with the landing page) shows the band, greyed when disconnected.

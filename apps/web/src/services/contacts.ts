@@ -2,7 +2,7 @@
  * Contact book helpers for CHP / family / supervisor escalation.
  */
 
-import type { AlertRecord, Contact } from '@neema/core';
+import { isPlaceholderPhone, type AlertRecord, type Contact } from '@neema/core';
 import { db } from '../storage/db';
 
 /** Upserts a contact. */
@@ -31,4 +31,28 @@ export async function setAlertOutcome(
   const row = await db.alerts.get(alertId);
   if (!row) return;
   await db.alerts.put({ ...row, outcome });
+}
+
+/** Whether Neema has someone real to alert. */
+export interface ContactReadiness {
+  /** At least one CHP with a real (non-placeholder) number. */
+  hasRealChp: boolean;
+  hasRealFamily: boolean;
+  /** Contacts whose numbers look fake (e.g. demo numbers from older builds). */
+  placeholders: Contact[];
+  /** Contacts that alerts may actually go to. */
+  usable: Contact[];
+}
+
+/** Checks the contact book before relying on it for alerts. */
+export async function contactReadiness(): Promise<ContactReadiness> {
+  const all = await listContacts();
+  const placeholders = all.filter((c) => isPlaceholderPhone(c.phone));
+  const usable = all.filter((c) => !isPlaceholderPhone(c.phone));
+  return {
+    hasRealChp: usable.some((c) => c.role === 'chp'),
+    hasRealFamily: usable.some((c) => c.role === 'family'),
+    placeholders,
+    usable,
+  };
 }

@@ -8,6 +8,7 @@ import { StatusOrb } from '../ui/StatusOrb';
 import { LoadingScreen } from '../ui/LoadingScreen';
 import { ErrorScreen } from '../ui/ErrorScreen';
 import { getMessageTextFor, speakMessageKey } from '../services/speech';
+import { buildSmsLink } from '../services/alerts';
 import { reasonPhrase, topReason } from '@neema/core';
 
 /** Guided alert ritual — breathe → message → wait. */
@@ -82,6 +83,19 @@ export function AlertPage() {
           <Button variant="secondary" style={{ width: '100%', marginTop: '0.65rem' }} onClick={() => nav('/chase')}>
             {t('chase_cta')}
           </Button>
+        </div>
+      ) : null}
+
+      {g.escalationNotice && isRed && !g.redAcknowledged ? (
+        <div className="panel escalation-notice" role="alert" data-testid="escalation-notice" style={{ margin: '0.75rem 0' }}>
+          <strong>
+            {lang === 'sw' ? 'Hakuna aliyethibitisha bado' : 'No one has confirmed yet'}
+          </strong>
+          <p style={{ margin: '0.35rem 0 0' }}>
+            {lang === 'sw'
+              ? `Tuma SMS kwa ${g.escalationNotice.name} sasa.`
+              : `Send the SMS to ${g.escalationNotice.name} now.`}
+          </p>
         </div>
       ) : null}
 
@@ -163,7 +177,13 @@ export function AlertPage() {
           {sms.map((item, i) => (
             <a
               key={item.contactId}
-              className={`btn ${i === 0 ? (isRed ? 'btn-danger' : 'btn-primary') : 'btn-secondary'}`}
+              className={`btn ${
+                (i === 0 || item.escalated) && !item.opened
+                  ? isRed
+                    ? 'btn-danger'
+                    : 'btn-primary'
+                  : 'btn-secondary'
+              }`}
               href={item.href}
               data-opened={item.opened}
               style={{ width: '100%', marginTop: i === 0 ? 0 : '0.6rem' }}
@@ -179,14 +199,33 @@ export function AlertPage() {
             </a>
           ))}
         </div>
-      ) : !g.redAcknowledged ? (
-        <Button
-          variant={isRed ? 'danger' : 'primary'}
-          style={{ width: '100%' }}
-          onClick={() => void g.refreshTriage(isRed)}
-        >
-          {lang === 'sw' ? 'Andaa SMS tena' : 'Prepare SMS again'}
-        </Button>
+      ) : g.alertBody && !g.redAcknowledged ? (
+        <div className="panel" role="alert" data-testid="no-contacts" style={{ marginBottom: '0.75rem' }}>
+          <strong>{lang === 'sw' ? 'Hakuna namba ya CHP iliyohifadhiwa' : 'No CHP number saved'}</strong>
+          <p className="soft-note" style={{ margin: '0.35rem 0 0.75rem' }}>
+            {lang === 'sw'
+              ? 'Fungua SMS na uchague mtu wa kumtumia, au piga simu kwa mtu wa karibu.'
+              : 'Open the SMS and choose who to send it to, or call someone near you.'}
+          </p>
+          <a
+            className={`btn ${isRed ? 'btn-danger' : 'btn-primary'}`}
+            href={buildSmsLink(null, g.alertBody)}
+            style={{ width: '100%' }}
+          >
+            {lang === 'sw' ? 'Chagua wa kumtumia SMS' : 'Choose who to text'}
+          </a>
+          <Button variant="secondary" style={{ width: '100%', marginTop: '0.6rem' }} onClick={() => nav('/contacts?setup=1')}>
+            {lang === 'sw' ? 'Ongeza namba ya CHP' : 'Add a CHP number'}
+          </Button>
+        </div>
+      ) : null}
+
+      {isRed && !g.redAcknowledged && g.escalationDueInSec !== null ? (
+        <p className="soft-note" style={{ textAlign: 'center', marginTop: '0.6rem' }} data-testid="escalation-countdown">
+          {lang === 'sw'
+            ? `Kama hakuna jibu, Neema itamfikia mtu mwingine baada ya ${Math.floor(g.escalationDueInSec / 60)}:${String(g.escalationDueInSec % 60).padStart(2, '0')}`
+            : `If nobody confirms, Neema reaches the next person in ${Math.floor(g.escalationDueInSec / 60)}:${String(g.escalationDueInSec % 60).padStart(2, '0')}`}
+        </p>
       ) : null}
 
       {(g.recheck.status === 'due' || g.recheck.status === 'scheduled') && !isRed ? (

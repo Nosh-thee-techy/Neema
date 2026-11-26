@@ -16,6 +16,7 @@ import {
 import { db } from '../storage/db';
 import { getAuthMeta, isSessionUnlocked } from './auth';
 import { loadConsent } from './passport';
+import { contactReadiness } from './contacts';
 
 export interface ReadinessReport {
   demoAllowed: boolean;
@@ -30,6 +31,7 @@ export interface ReadinessReport {
   pinEnabled: boolean;
   sessionUnlocked: boolean;
   consentOnFile: boolean;
+  chpContactOnFile: boolean;
   blockers: string[];
 }
 
@@ -100,6 +102,7 @@ export async function getReadiness(): Promise<ReadinessReport> {
   const pinEnabled = Boolean(auth?.pinEnabled);
   const sessionUnlocked = !pinEnabled || isSessionUnlocked();
   const consentOnFile = Boolean(consent);
+  const contacts = await contactReadiness();
 
   const blockers: string[] = [];
   if (!configSigned) blockers.push('Triage thresholds are not clinician-signed.');
@@ -109,6 +112,8 @@ export async function getReadiness(): Promise<ReadinessReport> {
   if (!hardwareEngineeringPass) blockers.push('Hardware engineering QA has not passed.');
   if (pinEnabled && !sessionUnlocked) blockers.push('Session is locked.');
   if (!consentOnFile) blockers.push('No consent record on file.');
+  if (!contacts.hasRealChp) blockers.push('No CHP phone number saved.');
+  if (contacts.placeholders.length) blockers.push('Some contacts still have placeholder numbers.');
 
   return {
     demoAllowed: true,
@@ -123,6 +128,7 @@ export async function getReadiness(): Promise<ReadinessReport> {
     pinEnabled,
     sessionUnlocked,
     consentOnFile,
+    chpContactOnFile: contacts.hasRealChp,
     blockers,
   };
 }

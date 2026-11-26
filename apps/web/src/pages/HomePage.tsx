@@ -333,6 +333,27 @@ export function HomePage() {
             </button>
           ) : null}
 
+          {today.hasRealChp === false ? (
+            <button
+              type="button"
+              className="panel contact-warning"
+              data-testid="no-chp-warning"
+              style={{ width: '100%', textAlign: 'left', marginTop: '0.75rem', cursor: 'pointer', font: 'inherit' }}
+              onClick={() => nav('/contacts?setup=1')}
+            >
+              <strong>{lang === 'sw' ? 'Hakuna namba ya CHP' : 'No CHP number saved'}</strong>
+              <span className="soft-note" style={{ display: 'block', marginTop: '0.25rem' }}>
+                {today.placeholderContacts > 0
+                  ? lang === 'sw'
+                    ? 'Kuna namba za mfano tu. Weka namba halisi ili tahadhari imfikie mtu.'
+                    : 'Only sample numbers are saved. Add a real number so alerts reach someone.'
+                  : lang === 'sw'
+                    ? 'Tahadhari haitamfikia mtu. Gusa hapa kuongeza CHP wako.'
+                    : 'Alerts will reach no one. Tap here to add your CHP.'}
+              </span>
+            </button>
+          ) : null}
+
           <SosButton
             lang={lang}
             onTrigger={() => {

@@ -12,7 +12,17 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { RuleId, Stage, SymptomCode, TriageResult, VitalsSample } from '@neema/core';
+import {
+  DEMO_ESCALATION,
+  FIELD_ESCALATION,
+  type AlertRecord,
+  type Contact,
+  type RuleId,
+  type Stage,
+  type SymptomCode,
+  type TriageResult,
+  type VitalsSample,
+} from '@neema/core';
 import { getMessageText } from '../services/speech';
 import { createSimulatorBand, isSimulatorBand } from '../services/simulatorBand';
 import { createWebBluetoothBand } from '../services/webBluetoothBand';
@@ -27,8 +37,18 @@ import {
   type RecheckState,
 } from '../services/recheck';
 import { runAlertChain } from '../services/alertChain';
-import { acknowledgeRed, activeRedAlert, markNotified, type AcknowledgedBy } from '../services/alerts';
+import {
+  acknowledgeRed,
+  activeRedAlert,
+  buildSmsLink,
+  firstRecipients,
+  markNotified,
+  type AcknowledgedBy,
+} from '../services/alerts';
 import { tickFollowUps } from '../services/followUp';
+import { contactReadiness } from '../services/contacts';
+import { startEscalation } from '../services/escalation';
+import { soundAlarm } from '../services/alarm';
 import { loadProfile } from '../services/passport';
 import { resetDemoData, seedDemoStep, type DemoStep } from '../services/demoPlayer';
 import type { EscalationHandle } from '../services/escalation';
@@ -43,6 +63,15 @@ export interface PendingSms {
   role: 'chp' | 'family' | 'supervisor';
   href: string;
   opened: boolean;
+  /** Added by escalation because nobody acknowledged in time. */
+  escalated?: boolean;
+}
+
+/** An escalation step that just fired: nobody acknowledged in time. */
+export interface EscalationNotice {
+  name: string;
+  label: 'next' | 'supervisor';
+  atMs: number;
 }
 
 /** A reply from the CHP. In demo mode it is scripted (project doc ??10). */
@@ -100,6 +129,12 @@ interface GuardianState {
   /** True when RED is still showing but someone has confirmed they are acting on it. */
   redAcknowledged: boolean;
   chpReply: ChpReply | null;
+  /** The SMS text of the active alert (for the "choose who to text" fallback). */
+  alertBody: string | null;
+  /** Set when escalation reached a new contact; shown loudly on the alert screen. */
+  escalationNotice: EscalationNotice | null;
+  /** Seconds until the next escalation step, or null when none is planned. */
+  escalationDueInSec: number | null;
   /** Stage used for triage (from the Passport, or the demo step). */
   stage: Stage;
   demoStep: DemoStep | null;
@@ -148,6 +183,11 @@ export function GuardianProvider({ children }: { children: ReactNode }) {
   );
   const ackRef = useRef<{ rules: RuleId[]; atMs: number } | null>(null);
   const replyTimerRef = useRef<number | null>(null);
+  const alertBodyRef = useRef<string | null>(null);
+  /** Alert whose SMS buttons/escalation are already set up in this page session. */
+  const restoredAlertRef = useRef<string | null>(null);
+  const restoreOpenAlertRef = useRef<(alert: AlertRecord) => Promise<void>>(async () => undefined);
+  const demoActiveRef = useRef<boolean>(false);
 
   const [sample, setSample] = useState<VitalsSample | null>(null);
   const [triage, setTriage] = useState<TriageResult | null>(null);
@@ -160,6 +200,10 @@ export function GuardianProvider({ children }: { children: ReactNode }) {
   const [redAcknowledged, setRedAcknowledged] = useState(false);
   const [stage, setStage] = useState<Stage>('pregnancy');
   const [demoStep, setDemoStep] = useState<DemoStep | null>(savedDemo?.step ?? null);
+  const [alertBody, setAlertBody] = useState<string | null>(null);
+  const [escalationNotice, setEscalationNotice] = useState<EscalationNotice | null>(null);
+  const [escalationDueInSec, setEscalationDueInSec] = useState<number | null>(null);
+  demoActiveRef.current = demoStep !== null;
   const [activeAlertId, setActiveAlertId] = useState<string | null>(null);
   const [lastChainNote, setLastChainNote] = useState<string | null>(null);
   const [recheck, setRecheck] = useState<RecheckState>(recheckRef.current.getState());
@@ -227,16 +271,23 @@ export function GuardianProvider({ children }: { children: ReactNode }) {
           latest.acknowledgedAtMs === undefined &&
           prev === null;
         if (reuseOpen) {
-          setActiveAlertId(latest.id);
+          await restoreOpenAlertRef.current(latest);
           setLastChainNote(
             result.level === 'RED'
               ? 'Open the message to reach your CHP now.'
               : 'A quiet heads-up for your CHP is ready.',
           );
         } else {
-          const chain = await runAlertChain(result, { allowDemo: true, skipConsent: true });
+          const chain = await runAlertChain(
+            result,
+            { allowDemo: true, skipConsent: true },
+            demoActiveRef.current ? DEMO_ESCALATION : FIELD_ESCALATION,
+          );
           if (chain) {
             setChpReply(null);
+            setEscalationNotice(null);
+            alertBodyRef.current = chain.body;
+            setAlertBody(chain.body);
             setPendingSms(
               chain.smsLinks.map(({ contact, href }) => ({
                 contactId: contact.id,
@@ -247,6 +298,7 @@ export function GuardianProvider({ children }: { children: ReactNode }) {
               })),
             );
             setActiveAlertId(chain.alertId);
+            restoredAlertRef.current = chain.alertId;
             escalationRef.current?.stop();
             escalationRef.current = chain.escalation;
             setLastChainNote(
@@ -295,20 +347,83 @@ export function GuardianProvider({ children }: { children: ReactNode }) {
 
   refreshRef.current = refreshTriage;
 
+  /** Nobody acknowledged in time: offer an SMS to the next person and make noise. */
+  const offerEscalationSms = useCallback((contact: Contact, label: 'next' | 'supervisor') => {
+    const body = alertBodyRef.current;
+    if (!body) return;
+    setPendingSms((list) =>
+      list.some((p) => p.contactId === contact.id)
+        ? list
+        : [
+            ...list,
+            {
+              contactId: contact.id,
+              name: contact.name,
+              role: contact.role,
+              href: buildSmsLink(contact.phone, body),
+              opened: false,
+              escalated: true,
+            },
+          ],
+    );
+    setEscalationNotice({ name: contact.name, label, atMs: Date.now() });
+    soundAlarm();
+    void bandRef.current.sendCommand({ kind: 'vibrate', pattern: 'long' }).catch(() => undefined);
+  }, []);
+
+  /**
+   * Rebuilds the SMS buttons (and, for RED, the escalation timer) for an alert that
+   * is still open after a reload. Idempotent per alert, so the mount effect and the
+   * reload guard in handleLevelTransition can both call it safely.
+   */
+  const restoreOpenAlert = useCallback(async (alert: AlertRecord) => {
+    if (restoredAlertRef.current === alert.id) return;
+    restoredAlertRef.current = alert.id;
+    setActiveAlertId(alert.id);
+    if (!alert.smsBody) return;
+    const body = alert.smsBody;
+    alertBodyRef.current = body;
+    setAlertBody(body);
+    const { usable } = await contactReadiness();
+    const first = firstRecipients(alert.level, usable);
+    const opened = new Set(alert.notified.map((n) => n.contactId));
+    setPendingSms(
+      first.map((c) => ({
+        contactId: c.id,
+        name: c.name,
+        role: c.role,
+        href: buildSmsLink(c.phone, body),
+        opened: opened.has(c.id),
+      })),
+    );
+    if (alert.level === 'RED') {
+      escalationRef.current?.stop();
+      escalationRef.current = startEscalation(
+        alert.id,
+        usable,
+        first.map((c) => c.id),
+        demoActiveRef.current ? DEMO_ESCALATION : FIELD_ESCALATION,
+        alert.tsMs,
+      );
+    }
+  }, []);
+  restoreOpenAlertRef.current = restoreOpenAlert;
+
   useEffect(() => {
     bindBand(bandRef.current);
     return () => unsubRef.current?.();
   }, [bindBand]);
 
-  // A sticky RED survives reloads: restore its id so it can be acknowledged.
+  // A sticky RED survives reloads: restore its id, SMS buttons and escalation.
   useEffect(() => {
-    void activeRedAlert().then((alert) => {
+    void (async () => {
+      const alert = await activeRedAlert();
       if (alert) {
-        setActiveAlertId(alert.id);
         lastLevel.current = 'RED';
+        await restoreOpenAlertRef.current(alert);
       }
       void refreshRef.current(false);
-    });
+    })();
     return () => {
       if (replyTimerRef.current) window.clearTimeout(replyTimerRef.current);
     };
@@ -327,11 +442,15 @@ export function GuardianProvider({ children }: { children: ReactNode }) {
         setRecheckDueInSec(null);
       }
 
-      void escalationRef.current?.tick().then((step) => {
-        if (step.kind === 'notify') {
-          setLastChainNote(`Escalation ? ${step.label}: contact ${step.contact.name}`);
-        }
-      });
+      const esc = escalationRef.current;
+      if (esc) {
+        void esc.tick().then((step) => {
+          if (step.kind === 'notify') offerEscalationSms(step.contact, step.label);
+          // Read the next due time after the tick, so a step that just fired never shows 0:00.
+          const due = step.kind === 'acknowledged' ? null : esc.nextDueAtMs();
+          setEscalationDueInSec(due === null ? null : Math.max(0, Math.ceil((due - Date.now()) / 1000)));
+        });
+      }
 
       void tickFollowUps();
     }, 1000);
@@ -400,6 +519,9 @@ export function GuardianProvider({ children }: { children: ReactNode }) {
       activeAlertId,
       redAcknowledged,
       chpReply,
+      alertBody,
+      escalationNotice,
+      escalationDueInSec,
       stage,
       demoStep,
       lastChainNote,
@@ -467,6 +589,8 @@ export function GuardianProvider({ children }: { children: ReactNode }) {
         escalationRef.current = null;
         setActiveAlertId(null);
         setPendingSms([]);
+        setEscalationNotice(null);
+        setEscalationDueInSec(null);
         setLastChainNote(
           by === 'chp_replied'
             ? 'Your CHP is on the way.'
@@ -500,6 +624,10 @@ export function GuardianProvider({ children }: { children: ReactNode }) {
             setActiveAlertId(null);
             setPendingSms([]);
             setChpReply(null);
+            setEscalationNotice(null);
+            setEscalationDueInSec(null);
+            setAlertBody(null);
+            alertBodyRef.current = null;
             ackRef.current = null;
             lastLevel.current = null;
           }
@@ -539,6 +667,10 @@ export function GuardianProvider({ children }: { children: ReactNode }) {
         setActiveAlertId(null);
         setPendingSms([]);
         setChpReply(null);
+        setEscalationNotice(null);
+        setEscalationDueInSec(null);
+        setAlertBody(null);
+        alertBodyRef.current = null;
         setDemoStep(null);
         saveDemo(null);
         setRedAcknowledged(false);
@@ -588,6 +720,9 @@ export function GuardianProvider({ children }: { children: ReactNode }) {
       refreshTriage,
       bindBand,
       pendingSms,
+      alertBody,
+      escalationNotice,
+      escalationDueInSec,
     ],
   );
 

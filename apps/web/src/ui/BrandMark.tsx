@@ -10,8 +10,8 @@ export function BrandMark({ showSub = false }: { showSub?: boolean }) {
       <svg viewBox="0 0 48 48" aria-hidden>
         <defs>
           <linearGradient id={`${id}g`} x1="6" y1="4" x2="42" y2="46" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stopColor="#8E7FF8" />
-            <stop offset="1" stopColor="#5246DD" />
+            <stop offset="0" stopColor="#33456B" />
+            <stop offset="1" stopColor="#121A2C" />
           </linearGradient>
           <mask id={`${id}m`}>
             <rect width="48" height="48" fill="#fff" />
@@ -19,8 +19,8 @@ export function BrandMark({ showSub = false }: { showSub?: boolean }) {
           </mask>
         </defs>
         <rect width="48" height="48" rx="14" fill={`url(#${id}g)`} />
-        <circle cx="23" cy="25" r="11" fill="#fff" mask={`url(#${id}m)`} />
-        <circle cx="33" cy="15" r="2.4" fill="#fff" />
+        <circle cx="23" cy="25" r="11" fill="#EDE7DC" mask={`url(#${id}m)`} />
+        <circle cx="33" cy="15" r="2.4" fill="#7FD6A8" />
       </svg>
       <div>
         <strong>Neema</strong>
