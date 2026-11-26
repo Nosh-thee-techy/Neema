@@ -24,5 +24,6 @@
       "@neema/core": ["../../packages/core/src/index.ts"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/vite"]
 }

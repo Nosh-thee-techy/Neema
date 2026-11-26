@@ -1,0 +1,29 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "neema-passport-woman-rig"
+  },
+  "scene": 0,
+  "scenes": [{ "name": "PassportWoman", "nodes": [0] }],
+  "nodes": [
+    { "name": "root", "children": [1] },
+    { "name": "hips", "children": [2], "translation": [0, 0.9, 0] },
+    { "name": "spine", "children": [3], "translation": [0, 0.12, 0] },
+    { "name": "chest", "children": [4, 6, 10], "translation": [0, 0.22, 0] },
+    { "name": "neck", "children": [5], "translation": [0, 0.18, 0] },
+    { "name": "head", "translation": [0, 0.12, 0] },
+    { "name": "shoulder_l", "children": [7], "translation": [0.16, 0.14, 0] },
+    { "name": "upper_arm_l", "children": [8], "translation": [0.12, -0.02, 0] },
+    { "name": "lower_arm_l", "children": [9], "translation": [0, -0.28, 0] },
+    { "name": "hand_l", "translation": [0, -0.26, 0] },
+    { "name": "shoulder_r", "children": [11], "translation": [-0.16, 0.14, 0] },
+    { "name": "upper_arm_r", "children": [12], "translation": [-0.12, -0.02, 0] },
+    { "name": "lower_arm_r", "children": [13], "translation": [0, -0.28, 0] },
+    { "name": "hand_r", "translation": [0, -0.26, 0] }
+  ],
+  "extras": {
+    "honesty": "Procedural passport woman rig for How2Sign research ASL playback. Not a scanned person. Not Kenyan Sign Language. Not clinical messaging.",
+    "label": "ASL_RESEARCH_RIG_NOT_KSL",
+    "license": "CC0 Neema-authored placeholder rig"
+  }
+}

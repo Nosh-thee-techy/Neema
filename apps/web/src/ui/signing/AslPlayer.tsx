@@ -1,11 +1,15 @@
 /**
- * Canvas signer ported from CareLoop AslSample.
- * Plays a How2Sign pose packet. Research demo only — not KSL.
+ * Plays a How2Sign pose packet. Prefers passport 3D (Three.js); falls back to canvas.
+ * Research demo only — not KSL.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { ASL_CITATION, ASL_LABEL, clipUrl } from './aslLibrary';
 import { paintWomanSigner } from './paintWoman';
+
+const GlbSigner = lazy(() =>
+  import('./GlbSigner').then((m) => ({ default: m.GlbSigner })),
+);
 
 type Frame = {
   proj: number[][];
@@ -40,6 +44,7 @@ export function AslPlayer({
   replay = 0,
   tall = false,
   passport = false,
+  prefer3d = true,
   showCaption = true,
   onLine,
   onProblem,
@@ -53,6 +58,8 @@ export function AslPlayer({
   tall?: boolean;
   /** Passport-card framing (chest-up portrait). */
   passport?: boolean;
+  /** Try WebGL woman first; canvas fallback if WebGL fails. */
+  prefer3d?: boolean;
   showCaption?: boolean;
   onLine?: (line: SignedLine | null) => void;
   onProblem?: (message: string) => void;
@@ -60,6 +67,7 @@ export function AslPlayer({
   const canvas = useRef<HTMLCanvasElement>(null);
   const [clip, setClip] = useState<Clip | null>(null);
   const [problem, setProblem] = useState('');
+  const [use3d, setUse3d] = useState(prefer3d && passport);
 
   useEffect(() => {
     let cancelled = false;
@@ -99,6 +107,7 @@ export function AslPlayer({
   }, [clipId, onLine, onProblem]);
 
   useEffect(() => {
+    if (use3d) return;
     const frames = clip?.frames ?? [];
     let index = 0;
     let last = 0;
@@ -125,24 +134,39 @@ export function AslPlayer({
     };
     handle = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(handle);
-  }, [clip, paused, speed, replay]);
+  }, [clip, paused, speed, replay, use3d]);
 
   const shell = [
     'asl-player',
     tall ? 'asl-player--tall' : '',
     passport ? 'asl-player--passport' : '',
+    use3d ? 'asl-player--glb' : '',
   ]
     .filter(Boolean)
     .join(' ');
 
   return (
     <div className={shell}>
-      <canvas
-        ref={canvas}
-        role="img"
-        aria-label={clip ? `Signing figure: ${clip.sentence}` : 'Signing figure'}
-        className="asl-player__canvas"
-      />
+      {use3d ? (
+        <Suspense fallback={<div className="asl-player__glb-host" aria-hidden />}>
+          <GlbSigner
+            clip={clip}
+            paused={paused}
+            speed={speed}
+            replay={replay}
+            onReady={(ok) => {
+              if (!ok) setUse3d(false);
+            }}
+          />
+        </Suspense>
+      ) : (
+        <canvas
+          ref={canvas}
+          role="img"
+          aria-label={clip ? `Signing figure: ${clip.sentence}` : 'Signing figure'}
+          className="asl-player__canvas"
+        />
+      )}
       {problem ? <p className="asl-player__problem">{problem}</p> : null}
       {showCaption && clip ? (
         <p className="asl-player__caption soft-note">

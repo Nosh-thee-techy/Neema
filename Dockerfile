@@ -21,5 +21,6 @@ ENV NODE_ENV=production
 ENV PORT=8080
 COPY --from=build /repo/apps/web/dist ./dist
 COPY apps/web/server.mjs ./server.mjs
+COPY apps/web/signPlanServer.mjs ./signPlanServer.mjs
 EXPOSE 8080
 CMD ["node", "server.mjs"]

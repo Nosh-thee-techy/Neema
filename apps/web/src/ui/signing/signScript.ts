@@ -288,3 +288,51 @@ export function guideForAnswer(answerId: string): GuideReply {
 export function chapterById(id: string): SignChapter {
   return SIGN_CHAPTERS.find((c) => c.id === id) ?? SIGN_CHAPTERS[0]!;
 }
+
+/** Every clip id that may appear in a signed conversation (LLM allowlist). */
+export const ALLOWLISTED_CLIP_IDS: readonly string[] = Array.from(
+  new Set([
+    ...SIGN_ORDER,
+    ...SIGN_CHAPTERS.flatMap((c) => c.order),
+    ...Object.keys(SIGN_REPLIES),
+  ]),
+);
+
+/** Short catalog for server-side gloss→clip planning (id + sentence hint). */
+export const CLIP_CATALOG: readonly { id: string; hint: string }[] = [
+  { id: 'FzQPg4aqNYc_0-1', hint: 'Hi!' },
+  { id: '--8pSDeC-fg_0-5', hint: 'Hi.' },
+  { id: '1xKU91ggLeI_2-5', hint: 'How are you?' },
+  { id: '--8pSDeC-fg_7-5', hint: 'How do you feel about yourself?' },
+  { id: '06jk1stVwMI_2-5', hint: 'Are you comfortable?' },
+  { id: 'CE23zzfUBDw_7-5', hint: 'Have you seen any problems with that?' },
+  { id: 'FzUdcaxw_vs_10-2', hint: 'Why?' },
+  { id: 'g1HXoDkax5A_20-3', hint: "It's extremely painful." },
+  { id: 'cQBrXCcfDyc_22-5', hint: 'Are you ready?' },
+  { id: 'Cu1rDgWOZ9w_15-8', hint: 'See you in the next step.' },
+  { id: '5dodEz2r56M_16-8', hint: 'Take care.' },
+  { id: '-0N0jbyBW6g_11-5', hint: 'Thank you.' },
+  { id: '-F6vN4bOBWs_16-8', hint: 'Dr. Felicia here, goodbye.' },
+  { id: 'FzQPg4aqNYc_2-1', hint: "We're back." },
+  { id: 'G06Irzcwxiw_19-1', hint: 'To get through all that.' },
+  { id: 'G095RWKQ39g_17-1', hint: 'So after a night of doing that, that can be a little bit strenuous.' },
+  { id: 'G06Irzcwxiw_21-1', hint: "You enjoy the moment of what you're doing." },
+  { id: 'FzUdcaxw_vs_17-2', hint: 'Make it fun.' },
+  { id: 'G06Irzcwxiw_25-1', hint: "You're having a good time along the way." },
+  { id: 'FzUdcaxw_vs_16-2', hint: 'Before you know it, your chores are all going to be done.' },
+  { id: '--8pSDeC-fg_1-5', hint: 'My name is Dr. Art Bowler.' },
+];
+
+export function filterAllowlistedClipIds(ids: unknown): string[] {
+  const allow = new Set(ALLOWLISTED_CLIP_IDS);
+  if (!Array.isArray(ids)) return [];
+  const out: string[] = [];
+  for (const raw of ids) {
+    if (typeof raw !== 'string') continue;
+    const id = raw.trim();
+    if (!allow.has(id)) continue;
+    if (out.includes(id)) continue;
+    out.push(id);
+  }
+  return out;
+}

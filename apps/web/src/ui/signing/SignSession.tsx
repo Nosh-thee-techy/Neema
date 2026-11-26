@@ -4,6 +4,7 @@
  */
 
 import { useCallback, useMemo, useState } from 'react';
+import { fetchSignPlan } from '../../services/signPlan';
 import { ASL_PLAYBACK_RATE, AslPlayer, type SignedLine } from './AslPlayer';
 import { ASL_CITATION, ASL_LABEL } from './aslLibrary';
 import {
@@ -34,6 +35,7 @@ export function SignSession({
   onHandoff?: (kind: SignHandoff) => void;
 }) {
   const [chapter, setChapter] = useState<SignChapter | null>(null);
+  const [orderOverride, setOrderOverride] = useState<string[] | null>(null);
   const [step, setStep] = useState(0);
   const [reply, setReply] = useState<GuideReply | null>(null);
   const [line, setLine] = useState<SignedLine | null>(null);
@@ -43,8 +45,10 @@ export function SignSession({
   const [slow, setSlow] = useState(true);
   const [replay, setReplay] = useState(0);
   const [done, setDone] = useState(false);
+  const [planning, setPlanning] = useState(false);
+  const [planNote, setPlanNote] = useState('');
 
-  const order = chapter?.order ?? [];
+  const order = orderOverride ?? chapter?.order ?? [];
   const clipId = order[Math.min(step, Math.max(order.length - 1, 0))] ?? '';
   const answers: SignAnswer[] = useMemo(
     () => (clipId ? answersForClip(clipId) : []),
@@ -58,6 +62,8 @@ export function SignSession({
   function startChapter(id: string) {
     const next = chapterById(id);
     setChapter(next);
+    setOrderOverride(null);
+    setPlanNote('');
     setStep(0);
     setReply(null);
     setLine(null);
@@ -65,6 +71,39 @@ export function SignSession({
     setDone(false);
     setReplay((n) => n + 1);
     setPaused(prefersReducedMotion());
+  }
+
+  async function remixWithPlanner() {
+    if (!chapter || planning) return;
+    setPlanning(true);
+    setPlanNote('');
+    try {
+      const result = await fetchSignPlan({
+        chapterId: chapter.id,
+        prompt: `${chapter.titleEn}. ${chapter.blurbEn}`,
+        maxClips: Math.min(12, Math.max(4, chapter.order.length)),
+      });
+      if (result.order.length) {
+        setOrderOverride(result.order);
+        setStep(0);
+        setDone(false);
+        setReply(null);
+        setReplay((n) => n + 1);
+        setPlanNote(
+          lang === 'sw'
+            ? 'Mpango wa klipu (utafiti ASL) — si KSL.'
+            : result.label || 'Research ASL clip plan — not KSL.',
+        );
+      } else {
+        setPlanNote(
+          lang === 'sw'
+            ? 'Mpangaji haipatikani — tunaendelea na sura hii.'
+            : 'Planner unavailable — keeping this chapter.',
+        );
+      }
+    } finally {
+      setPlanning(false);
+    }
   }
 
   function onAnswer(id: string) {
@@ -103,8 +142,8 @@ export function SignSession({
         </header>
         <p className="soft-note" style={{ marginTop: '0.75rem' }}>
           {lang === 'sw'
-            ? 'Chagua mazungumzo. Klipu ni utafiti wa ASL (How2Sign) — si KSL, si ujumbe wa kliniki.'
-            : 'Pick a conversation. Clips are How2Sign research ASL — not KSL, not clinical messaging.'}
+            ? 'Chagua mazungumzo. Klipu ni utafiti wa ASL (How2Sign) — si KSL, si ujumbe wa kliniki. Mtu wa 3D ni passport.'
+            : 'Pick a conversation. Clips are How2Sign research ASL — not KSL, not clinical messaging. The figure is a passport 3D woman.'}
         </p>
         <section className="sign-session__chapters" aria-labelledby="sign-chapter-heading">
           <h2 id="sign-chapter-heading" className="section-title">
@@ -159,7 +198,10 @@ export function SignSession({
             type="button"
             className="btn btn-ghost"
             style={{ width: '100%', marginTop: '0.5rem' }}
-            onClick={() => setChapter(null)}
+            onClick={() => {
+              setChapter(null);
+              setOrderOverride(null);
+            }}
           >
             {lang === 'sw' ? 'Chagua mazungumzo mengine' : 'Pick another conversation'}
           </button>
@@ -172,7 +214,14 @@ export function SignSession({
     <main className="screen sign-session">
       <header className="sign-session__top">
         <strong>{lang === 'sw' ? chapter.titleSw : chapter.titleEn}</strong>
-        <button type="button" className="btn btn-ghost" onClick={() => setChapter(null)}>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => {
+            setChapter(null);
+            setOrderOverride(null);
+          }}
+        >
           {lang === 'sw' ? 'Badilisha' : 'Change'}
         </button>
       </header>
@@ -185,6 +234,7 @@ export function SignSession({
           clipId={clipId}
           tall
           passport
+          prefer3d
           showCaption={false}
           paused={paused}
           speed={slow ? ASL_PLAYBACK_RATE * 0.65 : ASL_PLAYBACK_RATE}
@@ -217,7 +267,22 @@ export function SignSession({
           <button type="button" className="btn btn-ghost" aria-pressed={slow} onClick={() => setSlow((v) => !v)}>
             {lang === 'sw' ? 'Polepole' : 'Slower'}
           </button>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            disabled={planning}
+            onClick={() => void remixWithPlanner()}
+          >
+            {planning
+              ? lang === 'sw'
+                ? 'Inapanga…'
+                : 'Planning…'
+              : lang === 'sw'
+                ? 'Panga tena'
+                : 'Remix clips'}
+          </button>
         </div>
+        {planNote ? <p className="soft-note sign-session__plan-note">{planNote}</p> : null}
       </section>
 
       {reply ? (
@@ -263,7 +328,15 @@ export function SignSession({
           <button type="button" className="btn btn-primary" style={{ width: '100%' }} onClick={onLeave}>
             {lang === 'sw' ? 'Maliza' : 'Done'}
           </button>
-          <button type="button" className="btn btn-ghost" style={{ width: '100%' }} onClick={() => setChapter(null)}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            style={{ width: '100%' }}
+            onClick={() => {
+              setChapter(null);
+              setOrderOverride(null);
+            }}
+          >
             {lang === 'sw' ? 'Mazungumzo mengine' : 'Another conversation'}
           </button>
         </div>
