@@ -6,12 +6,15 @@ import { Button } from '../ui/Button';
 import { LoadingScreen } from '../ui/LoadingScreen';
 import { ErrorScreen } from '../ui/ErrorScreen';
 import { BandArt } from '../ui/BandArt';
+import { useVitalsTrend } from '../hooks/useVitalsTrend';
+import { TonightCard, TrendCard, VitalRings } from '../ui/VitalsDashboard';
 
 /** Live band presence — human states, not BLE jargon. */
 export function VitalsPage() {
   const g = useGuardian();
   const nav = useNavigate();
   const { t, lang } = useLocale();
+  const trend = useVitalsTrend(`${g.connected}:${g.triage?.level ?? ''}`);
 
   if (g.error) {
     return (
@@ -43,33 +46,23 @@ export function VitalsPage() {
         <BandArt className="band-hero__art" compact />
       </div>
 
-      <div className="metric-row">
-        <div className="panel metric">
-          <span style={{ color: 'var(--ink-muted)' }}>{lang === 'sw' ? 'Mapigo' : 'Heart rate'}</span>
-          <b>{g.sample?.heartRate ?? '—'}</b>
-          <span>bpm</span>
-        </div>
-        <div className="panel metric">
-          <span style={{ color: 'var(--ink-muted)' }}>{lang === 'sw' ? 'Joto' : 'Skin temp'}</span>
-          <b>{g.sample?.skinTempC?.toFixed(1) ?? '—'}</b>
-          <span>°C</span>
-        </div>
-      </div>
+      <VitalRings
+        lang={lang}
+        sample={g.sample}
+        connected={g.connected}
+        trend={trend}
+        triage={g.triage}
+        show={['hr', 'temp', 'signal', 'battery']}
+      />
 
-      <div className="panel" style={{ marginTop: '0.9rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-          <span>{lang === 'sw' ? 'Ishara' : 'Signal'}</span>
-          <strong>{q}%</strong>
-        </div>
-        <div className="meter" aria-hidden>
-          <span style={{ width: `${q}%` }} />
-        </div>
-        {g.sample?.sos ? (
-          <p style={{ margin: '0.8rem 0 0', color: 'var(--danger-deep)', fontWeight: 700 }}>
-            {lang === 'sw' ? 'SOS imewashwa' : 'SOS is on'}
-          </p>
-        ) : null}
-      </div>
+      {g.sample?.sos ? (
+        <p className="panel" role="alert" style={{ marginTop: '0.9rem', color: 'var(--danger-deep)', fontWeight: 700 }}>
+          {lang === 'sw' ? 'SOS imewashwa' : 'SOS is on'}
+        </p>
+      ) : null}
+
+      <TonightCard lang={lang} sample={g.sample} connected={g.connected} trend={trend} />
+      <TrendCard lang={lang} trend={trend} />
 
       <div className="btn-row" style={{ marginTop: '1rem' }}>
         {!g.connected ? (

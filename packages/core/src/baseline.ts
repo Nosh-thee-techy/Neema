@@ -96,3 +96,22 @@ export function zScore(state: BaselineState, value: number): number | null {
   const std = Math.sqrt(Math.max(state.variance, 1e-6));
   return (value - state.mean) / std;
 }
+
+/** Minute samples needed before a baseline is trusted (about three days). */
+export const BASELINE_MIN_SAMPLES = DEFAULT_MIN_SAMPLES;
+
+/**
+ * Her normal range: mean ± k standard deviations, for display.
+ * Null until the learning period completes, so the UI never shows an untrusted range.
+ */
+export function normalRange(state: BaselineState, k = 2): { low: number; high: number } | null {
+  if (!state.ready || state.samples === 0) return null;
+  const std = Math.sqrt(Math.max(state.variance, 1e-6));
+  return { low: state.mean - k * std, high: state.mean + k * std };
+}
+
+/** Share of the learning period completed, 0..1 (1 once the baseline is ready). */
+export function baselineProgress(state: BaselineState, minSamples: number = DEFAULT_MIN_SAMPLES): number {
+  if (state.ready) return 1;
+  return Math.max(0, Math.min(1, state.samples / minSamples));
+}

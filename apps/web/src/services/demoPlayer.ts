@@ -8,7 +8,7 @@
  * Only for demo mode: it clears readings and alerts on this phone first.
  */
 
-import { getDemoScenario, type DemoScenarioId, type Stage } from '@neema/core';
+import { BASELINE_MIN_SAMPLES, getDemoScenario, type DemoScenarioId, type Stage } from '@neema/core';
 import { db } from '../storage/db';
 import { getReadiness } from './readiness';
 
@@ -41,15 +41,32 @@ const CORE_ID: Record<DemoStep, DemoScenarioId> = {
 
 /** Clears readings, alerts and daily summaries. Profile, contacts and consent stay. */
 export async function resetDemoData(): Promise<void> {
-  await db.transaction('rw', [db.vitalsMinutes, db.vitalsDaily, db.bp, db.symptoms, db.alerts], async () => {
-    await Promise.all([
-      db.vitalsMinutes.clear(),
-      db.vitalsDaily.clear(),
-      db.bp.clear(),
-      db.symptoms.clear(),
-      db.alerts.clear(),
-    ]);
-  });
+  await db.transaction(
+    'rw',
+    [db.vitalsMinutes, db.vitalsDaily, db.bp, db.symptoms, db.alerts, db.baseline],
+    async () => {
+      await Promise.all([
+        db.vitalsMinutes.clear(),
+        db.vitalsDaily.clear(),
+        db.bp.clear(),
+        db.symptoms.clear(),
+        db.alerts.clear(),
+        db.baseline.clear(),
+      ]);
+    },
+  );
+}
+
+/**
+ * A scripted "learned" baseline so the stage demo can show her normal band
+ * (project doc demo script, 0:30). Real phones learn it over about three days.
+ * Values sit around the scenario A night (heart rate 70–78, skin temperature ~36.9 °C).
+ */
+async function seedDemoBaseline(nowMs: number): Promise<void> {
+  await db.baseline.bulkPut([
+    { id: 'hr', mean: 73, variance: 9, samples: BASELINE_MIN_SAMPLES, lastUpdatedMs: nowMs, ready: true },
+    { id: 'temp', mean: 36.9, variance: 0.04, samples: BASELINE_MIN_SAMPLES, lastUpdatedMs: nowMs, ready: true },
+  ]);
 }
 
 /** True when demo tools may run (field-ready installs never get them). */
@@ -76,6 +93,7 @@ export async function seedDemoStep(step: DemoStep, nowMs: number = Date.now()): 
   }
 
   await resetDemoData();
+  await seedDemoBaseline(nowMs);
   await db.vitalsMinutes.bulkPut(input.vitals);
   if (input.bp.length) await db.bp.bulkPut(input.bp.map((b) => ({ ...b, id: crypto.randomUUID() })));
   if (input.symptoms.length) {

@@ -5,6 +5,8 @@ import { avatarState } from '@neema/core';
 import { useGuardian } from '../hooks/useGuardian';
 import { useLocale } from '../hooks/useLocale';
 import { useToday } from '../hooks/useToday';
+import { useVitalsTrend } from '../hooks/useVitalsTrend';
+import { TonightCard, TrendCard, VitalRings } from '../ui/VitalsDashboard';
 import { latestCheckInToday } from '../services/checkIn';
 import { latestEpds } from '../services/epdsStore';
 import { listChase } from '../services/followUp';
@@ -23,10 +25,7 @@ import {
   IconBell,
   IconCheck,
   IconChevron,
-  IconHeart,
-  IconPressure,
   IconQr,
-  IconTemp,
 } from '../ui/icons';
 
 const FULL_TERM_WEEKS = 40;
@@ -75,6 +74,7 @@ export function HomePage() {
   const { t, lang } = useLocale();
   const level = g.triage?.level ?? 'UNKNOWN';
   const today = useToday(`${level}:${g.recheck.status}`);
+  const trend = useVitalsTrend(`${level}:${g.demoStep ?? ''}`);
 
   const name = today.name ?? 'Mama';
   const alertActive = level === 'RED' || level === 'YELLOW';
@@ -236,9 +236,6 @@ export function HomePage() {
     });
   }
 
-  const heart = g.sample?.heartRate ?? null;
-  const temp = g.sample?.skinTempC ?? null;
-
   return (
     <main className="screen screen--home">
       {g.loading ? <LoadingScreen /> : null}
@@ -361,37 +358,20 @@ export function HomePage() {
             }}
           />
 
-          <div className="stat-row">
-            <div className="stat-tile" data-tone="heart">
-              <span className="stat-tile__icon">
-                <IconHeart />
-              </span>
-              <span className="stat-tile__value">
-                {heart ?? '—'}
-                {heart !== null ? <small>bpm</small> : null}
-              </span>
-              <span className="stat-tile__label">{t('heart')}</span>
-            </div>
-            <div className="stat-tile" data-tone="pressure">
-              <span className="stat-tile__icon">
-                <IconPressure />
-              </span>
-              <span className="stat-tile__value">
-                {today.lastBp ? `${today.lastBp.systolic}/${today.lastBp.diastolic}` : '—'}
-              </span>
-              <span className="stat-tile__label">{t('pressure')}</span>
-            </div>
-            <div className="stat-tile" data-tone="temp">
-              <span className="stat-tile__icon">
-                <IconTemp />
-              </span>
-              <span className="stat-tile__value">
-                {temp !== null ? temp.toFixed(1) : '—'}
-                {temp !== null ? <small>°C</small> : null}
-              </span>
-              <span className="stat-tile__label">{t('temp')}</span>
-            </div>
-          </div>
+          <VitalRings
+            lang={lang}
+            sample={g.sample}
+            connected={g.connected}
+            trend={trend}
+            triage={g.triage}
+            lastBp={today.lastBp}
+            stage={g.stage}
+            gestationWeeks={today.gestationWeeks}
+            show={['hr', 'temp', 'bp', 'weeks', 'signal']}
+            onOpen={(key) => nav(key === 'bp' ? '/bp' : key === 'weeks' ? '/passport' : '/vitals')}
+          />
+
+          <TonightCard lang={lang} sample={g.sample} connected={g.connected} trend={trend} />
         </section>
 
         <section>
@@ -423,6 +403,7 @@ export function HomePage() {
               </li>
             ))}
           </ul>
+          <TrendCard lang={lang} trend={trend} />
           <p className="trust-line">{t('saved_here')}</p>
         </section>
       </div>

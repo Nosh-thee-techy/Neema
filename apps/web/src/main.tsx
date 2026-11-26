@@ -7,6 +7,7 @@ import '@fontsource/instrument-serif/400-italic.css';
 import './styles/app.css';
 import './styles/alerting.css';
 import './styles/theme-linen.css';
+import './styles/dashboard.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

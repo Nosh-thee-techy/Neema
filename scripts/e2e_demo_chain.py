@@ -76,7 +76,7 @@ with sync_playwright() as p:
     def add_contact(name, phone, role):
         page.fill("#cname", name)
         page.fill("#cphone", phone)
-        page.select_option("#crole", role)
+        page.click(f'.add-panel__roles button[data-role="{role}"]')
         page.get_by_role("button", name="Hifadhi").click()
         page.wait_for_timeout(500)
     add_contact("Wanjiku", "12345", "chp")

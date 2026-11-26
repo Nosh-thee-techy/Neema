@@ -45,3 +45,13 @@ SpO2, motion, speech recognition, cloud DB, analytics, silent SMS, diagnosis wor
 21. **Theme in its own file** — `styles/theme-linen.css` loads after `app.css` and only overrides the look, so feature work in `app.css` keeps merging cleanly. Display font: Instrument Serif (OFL), self-hosted via `@fontsource/instrument-serif` so it works offline.
 22. **Status stays the hero** — the home card is a night-navy card with a thin status ring (amber card for YELLOW, crimson for RED, dashed outline for UNKNOWN); the alert screen is a dark disc inside a coloured ring. No invented 0–100 scores.
 23. **The band on the Band screen** — `ui/BandArt.tsx` (shared with the landing page) shows the band, greyed when disconnected.
+
+## Richer dashboards (dash/richer)
+
+24. **Ring gauges show real readings only** — heart rate, calibrated temperature, last BP, pregnancy week and band signal (Band screen: battery instead of BP and week). Ring colour comes from the same thresholds the rules use (`getDefaultTriageConfig`) or from her baseline band; no invented scores.
+25. **"Tonight" card** — heart rate on a half-circle gauge with her normal band (mean ± 2 SD from the personal baseline, `normalRange`). While the baseline is learning it says so and shows progress (`baselineProgress`), and only the fixed rules apply.
+26. **Trend card** — last 60 stored minutes for heart rate or temperature, with her normal band and the fever line.
+27. **Stage demo seeds a learned baseline** — so the demo can show "her normal" (project doc demo script, 0:30). Reset clears it. Real phones learn it over ~3 days.
+28. **Contacts as a table** — summary tiles, role filter chips, initials avatars, role and status chips, the first person alerted highlighted; real columns on wide screens. Role is chosen with buttons.
+29. **Displayed skin temperature is calibrated** — dashboards show the same calibrated value the rules use, not the raw skin reading.
+30. **Shared parts** — `ui/VitalsDashboard.tsx` (rings, Tonight, trend) is used by Home and Band so they match; styles live in `styles/dashboard.css`, not `app.css`.

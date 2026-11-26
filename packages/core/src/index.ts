@@ -44,7 +44,10 @@ export {
 } from './triage.js';
 
 export {
+  BASELINE_MIN_SAMPLES,
+  baselineProgress,
   createBaseline,
+  normalRange,
   updateBaseline,
   zScore,
   type BaselineSignal,
