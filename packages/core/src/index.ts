@@ -160,3 +160,14 @@ export {
   type EscalationStepPlan,
   type EscalationTiming,
 } from './escalation.js';
+
+export {
+  WHO_CARE_CARDS,
+  answerCareQuestion,
+  enforceCareGuardrails,
+  retrieveCareCards,
+  type CareCard,
+  type CareGuideAnswer,
+  type CareGuideContext,
+  type CareUrgency,
+} from './careCards.js';

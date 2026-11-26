@@ -1,6 +1,6 @@
 {
   "version": "0.2.0-placeholder",
-  "notes": "PLACEHOLDER thresholds from the Nov 2025 Cursor build brief. Pending clinician / CHP supervisor review. Not for clinical use.",
+  "notes": "PLACEHOLDER thresholds from the Nov 2025 Cursor build brief. Pending clinician / CHP supervisor review. Not for clinical use. Coaching copy uses WHO partner care cards (careCards.who.json): danger-sign clusters (headache / blurred vision / upper abdominal pain with raised BP), fever, bleeding, reduced movement, emergency referral. UNKNOWN never becomes GREEN; baseline/ML escalate to YELLOW only.",
   "bp": {
     "severeSys": 160,
     "severeDia": 110,

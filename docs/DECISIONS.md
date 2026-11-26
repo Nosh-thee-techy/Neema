@@ -20,6 +20,10 @@ Recorded while implementing from the Backend Cursor brief.
 
 SpO2, motion, speech recognition, cloud DB, analytics, silent SMS, diagnosis wording, invented first-aid text.
 
+## Care coach (WHO partner cards)
+
+31. **WHO as interim partner corpus** — until a hospital supplies standing orders, coaching answers come from versioned `careCards.who.json` (WHO hypertensive / ANC danger-sign framing). `/care` avatar chat (voice / text / sign mode) retrieves cards from triage level + reasons + question; optional OpenRouter only **rephrases** those cards. Guardrails: RED always handoff + go-now; UNKNOWN ≠ fine; no “you have preeclampsia.” Sign mode opens the allowlisted signer; free speech→sign is still out.
+
 ## Demo-chain fixes (fix/demo-chain)
 
 7. **Band feedback never sets SOS** — `vibrate: 'sos'` is only a vibration pattern. The simulator used to latch SOS on it, so RED re-raised itself forever. SOS now comes only from the band long-press, the simulator's `pressSos()`, or the app SOS button (hold 2 s).
