@@ -30,7 +30,7 @@ The **Neema** mark (a crescent keeping watch, one small light beside it) and wor
 
 ## Type
 
-**Plus Jakarta Sans** (variable, self-hosted through `@fontsource-variable` so it works offline). Headings 800 with tight tracking, body 400–500, numbers tabular.
+Warm and friendly: **Nunito** for UI body/controls and soft **Fraunces** for display titles (both variable, self-hosted through `@fontsource-variable` so they work offline). Headings ~550 with gentle tracking, body 400–600, numbers tabular.
 
 ## Layout
 

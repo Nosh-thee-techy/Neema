@@ -9,7 +9,7 @@
   --lp-muted: #6e6a62;
   --lp-accent: #5a80bf;
   --lp-line: rgba(43, 40, 35, 0.12);
-  --lp-display: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+  --lp-display: 'Fraunces Variable', Fraunces, Georgia, 'Times New Roman', serif;
   background: var(--lp-bg);
   color: var(--lp-ink);
   min-height: 100dvh;

@@ -24,7 +24,7 @@
 
 .todo-page__title {
   margin: 0.2rem 0 0;
-  font-family: var(--font-sans, 'Plus Jakarta Sans', system-ui, sans-serif);
+  font-family: var(--font-display);
   font-weight: 750;
   font-size: clamp(2.2rem, 7vw, 2.85rem);
   letter-spacing: -0.04em;

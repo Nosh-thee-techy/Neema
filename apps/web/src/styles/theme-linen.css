@@ -1,7 +1,7 @@
 /*
- * "Linen & night" theme: warm off-white surfaces, deep navy, light serif headlines,
- * pill buttons, hairline cards. Loaded after app.css and only overrides the look,
- * so feature work in app.css keeps merging cleanly.
+ * "Linen & night" theme: warm off-white surfaces, deep navy, soft Fraunces headlines,
+ * rounded Nunito UI, pill buttons, hairline cards. Loaded after app.css and only
+ * overrides the look, so feature work in app.css keeps merging cleanly.
  */
 
 :root {
@@ -35,7 +35,8 @@
   --shadow-soft: 0 4px 16px rgba(29, 39, 64, 0.06);
   --radius: 22px;
   --radius-sm: 16px;
-  --font-display: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+  --font-ui: 'Nunito Variable', Nunito, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Fraunces Variable', Fraunces, Georgia, 'Times New Roman', serif;
 }
 
 body {
@@ -67,8 +68,8 @@ body {
 .overlay-card h1,
 .overlay-card h2 {
   font-family: var(--font-display);
-  font-weight: 400;
-  letter-spacing: -0.01em;
+  font-weight: 550;
+  letter-spacing: -0.015em;
 }
 
 .screen-title {
@@ -93,9 +94,9 @@ body {
 
 .brand-mark strong {
   font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 1.6rem;
-  letter-spacing: 0.01em;
+  font-weight: 600;
+  font-size: 1.65rem;
+  letter-spacing: -0.01em;
 }
 
 .brand-mark svg {
