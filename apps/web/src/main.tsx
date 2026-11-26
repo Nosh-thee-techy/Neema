@@ -8,6 +8,7 @@ import './styles/app.css';
 import './styles/alerting.css';
 import './styles/theme-linen.css';
 import './styles/dashboard.css';
+import './styles/auth.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
