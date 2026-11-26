@@ -20,11 +20,17 @@ const T = {
   openReturning: c('Open Neema', 'Fungua Neema'),
   eyebrow: c('Maternal early warning · Prototype', 'Tahadhari ya mapema kwa mama · Mfano'),
   heroTitle: c('Neema Band', 'Bendi ya Neema'),
-  heroAccent: c('One clear action at 2am.', 'Hatua moja wazi saa nane usiku.'),
+  heroAccent: c('One clear action when it matters.', 'Hatua moja wazi inapohitajika.'),
   heroSub: c(
-    "A soft wristband and an offline phone app that watch a mother's heart rate and temperature through the night, learn what is normal for her, and turn warning signs into one spoken step and an SMS to her community health promoter.",
-    'Bendi laini ya mkono na programu ya simu isiyohitaji mtandao. Zinafuatilia mapigo ya moyo na joto la mama usiku kucha, zinajifunza kawaida yake, na kugeuza dalili za hatari kuwa hatua moja inayosemwa na SMS kwa mhudumu wake wa afya ya jamii.',
+    "Meet Neema — your everyday guardian. A soft wristband and offline phone app watch heart rate and temperature, learn what is normal for you, and turn warning signs into one spoken step and an SMS to your community health promoter.",
+    'Kutana na Neema — mlinzi wako kila siku. Bendi laini na programu isiyohitaji mtandao hufuatilia mapigo na joto, hujifunza kawaida yako, na hugeuza dalili za hatari kuwa hatua moja inayosemwa na SMS kwa mhudumu wako wa afya ya jamii.',
   ),
+  meetNeema: c('Meet Neema', 'Kutana na Neema'),
+  meetBody: c(
+    'She talks with you in Kiswahili or English — by voice, text, or sign. Behind her smile are WHO care cards and your live readings, so “what should I do?” stays grounded and safe.',
+    'Anaongea nawe kwa Kiswahili au Kiingereza — sauti, maandishi, au ishara. Nyuma ya tabasamu yake ni kadi za WHO na vipimo vyako, ili “nifanye nini?” ibaki salama.',
+  ),
+  meetCta: c('Talk with Neema', 'Ongea na Neema'),
   b1: c('Learns her normal', 'Inajifunza kawaida yake'),
   b2: c('Works without internet', 'Inafanya kazi bila mtandao'),
   b3: c('Speaks Kiswahili', 'Inazungumza Kiswahili'),
@@ -117,6 +123,7 @@ export function LandingPage() {
             <BrandMark />
           </Link>
           <nav className="lp-nav__links" aria-label={lang === 'sw' ? 'Sehemu za ukurasa' : 'Page sections'}>
+            <a href="#neema">{t('meetNeema')}</a>
             <a href="#band">{t('navBand')}</a>
             <a href="#how">{t('navHow')}</a>
             <a href="#honest">{t('navHonest')}</a>
@@ -164,7 +171,41 @@ export function LandingPage() {
             </div>
             <div className="lp-hero__art">
               <Ribbon />
-              <BandArt className="lp-band" />
+              <figure className="lp-neema-hero">
+                <img
+                  src="/brand/neema-companion.jpg"
+                  alt={lang === 'sw' ? 'Neema, mlinzi wa mama' : 'Neema, maternal guardian'}
+                  width={480}
+                  height={640}
+                  decoding="async"
+                />
+                <figcaption>Neema</figcaption>
+              </figure>
+              <BandArt className="lp-band lp-band--overlay" />
+            </div>
+          </div>
+        </section>
+
+        {/* Meet Neema */}
+        <section className="lp-meet" id="neema" aria-labelledby="meet-neema-title">
+          <div className="lp-wrap lp-meet__grid">
+            <div className="lp-meet__portrait">
+              <img
+                src="/brand/neema-companion.jpg"
+                alt=""
+                width={420}
+                height={560}
+                decoding="async"
+              />
+            </div>
+            <div className="lp-meet__copy">
+              <h2 className="lp-h2" id="meet-neema-title">
+                {t('meetNeema')}
+              </h2>
+              <p className="lp-lead">{t('meetBody')}</p>
+              <Link to="/start" className="lp-pill lp-pill--dark lp-pill--lg">
+                {t('meetCta')}
+              </Link>
             </div>
           </div>
         </section>

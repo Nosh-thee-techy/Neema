@@ -25,9 +25,9 @@ interface TrendChartProps {
   ariaLabel: string;
 }
 
-const W = 320;
-const H = 150;
-const PAD = { l: 34, r: 10, t: 12, b: 22 };
+const W = 360;
+const H = 188;
+const PAD = { l: 36, r: 12, t: 14, b: 26 };
 
 export function TrendChart(props: TrendChartProps) {
   const { points, windowMinutes, nowMs, band, limit, format, emptyLabel, nowLabel, ariaLabel } = props;

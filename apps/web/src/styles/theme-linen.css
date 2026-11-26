@@ -580,10 +580,3 @@ body {
   font-size: 1.35rem;
 }
 
-.sign-session__stage {
-  border-color: var(--line);
-}
-
-.sign-session__tap.btn {
-  border-radius: 16px;
-}

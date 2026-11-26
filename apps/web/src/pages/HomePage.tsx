@@ -1,32 +1,21 @@
-import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { avatarState } from '@neema/core';
 import { useGuardian } from '../hooks/useGuardian';
 import { useLocale } from '../hooks/useLocale';
 import { useToday } from '../hooks/useToday';
 import { useVitalsTrend } from '../hooks/useVitalsTrend';
-import { TonightCard, TrendCard, VitalRings } from '../ui/VitalsDashboard';
-import { latestCheckInToday } from '../services/checkIn';
-import { latestEpds } from '../services/epdsStore';
+import { TonightCard, TrendCard, displayTemp } from '../ui/VitalsDashboard';
+import { KpiTile, sparkFromValues, type KpiTone } from '../ui/KpiTile';
 import { listChase } from '../services/followUp';
-import { EMPTY_BIRTH_PLAN, loadProfile } from '../services/passport';
 import { getMessageTextFor } from '../services/speech';
 import { recheckDelayMs } from '../services/recheck';
-import { AvatarCompanion } from '../ui/AvatarCompanion';
 import { BrandMark } from '../ui/BrandMark';
 import { LangToggle } from '../ui/LangToggle';
 import { LoadingScreen } from '../ui/LoadingScreen';
 import { SigningSlot } from '../ui/SigningSlot';
 import { levelLabel } from '../ui/levelLabel';
 import { SosButton } from '../ui/SosButton';
-import {
-  IconBand,
-  IconBell,
-  IconCheck,
-  IconChevron,
-  IconQr,
-} from '../ui/icons';
+import { IconBell, IconChevron, IconHeart, IconPressure, IconTemp } from '../ui/icons';
 
 const FULL_TERM_WEEKS = 40;
 
@@ -56,18 +45,7 @@ interface Action {
   href?: string;
 }
 
-
-interface Row {
-  key: string;
-  title: string;
-  meta: string;
-  to: string;
-  /** undefined = not a check-in, show an icon instead of a tick. */
-  done?: boolean;
-  icon?: ReactNode;
-}
-
-/** Home: greeting, one status card with one next step, live numbers, today's check-ins. */
+/** Home: linen/glass bento — vitals, status, tonight. Care list lives on /todo. */
 export function HomePage() {
   const nav = useNavigate();
   const g = useGuardian();
@@ -82,35 +60,13 @@ export function HomePage() {
   const recheckScheduled = g.recheck.status === 'scheduled';
   const [awaitingArrival, setAwaitingArrival] = useState(false);
   const [openLoops, setOpenLoops] = useState(0);
-  const [checkInDone, setCheckInDone] = useState(false);
-  const [epdsMeta, setEpdsMeta] = useState<string | null>(null);
-  const [birthReady, setBirthReady] = useState<number | null>(null);
 
   useEffect(() => {
     void listChase().then((open) => {
       setOpenLoops(open.length);
       setAwaitingArrival(open.some((f) => f.stage === 'chase' || f.stage === 'act'));
     });
-    void latestCheckInToday().then((c) => setCheckInDone(Boolean(c)));
-    void latestEpds().then((row) => {
-      if (!row) {
-        setEpdsMeta(null);
-        return;
-      }
-      setEpdsMeta(clock(row.tsMs, lang));
-    });
-    void loadProfile()
-      .then((p) => {
-        const plan = { ...EMPTY_BIRTH_PLAN, ...p?.birthPlan };
-        const done = [plan.skilledAttendant, plan.bloodDonor, plan.savings, plan.companion, plan.transport].filter(
-          Boolean,
-        ).length;
-        setBirthReady(done);
-      })
-      .catch(() => setBirthReady(null));
-  }, [level, g.activeAlertId, lang]);
-
-  const companion = avatarState(level, awaitingArrival && level === 'RED');
+  }, [level, g.activeAlertId]);
 
   const headline =
     level === 'GREEN'
@@ -170,71 +126,44 @@ export function HomePage() {
   else if (g.connected && signal < 50) bandMeta = t('band_weak');
   else if (g.connected) bandMeta = t('band_watching');
 
-  const todayWord = t('today');
-  const rows: Row[] = [
-    {
-      key: 'bp',
-      title: t('pressure'),
-      meta:
-        today.bpToday && today.lastBp
-          ? `${todayWord}, ${clock(today.lastBp.tsMs, lang)} · ${today.lastBp.systolic}/${today.lastBp.diastolic}`
-          : t('not_yet_today'),
-      to: '/bp',
-      done: today.bpToday,
-    },
-    {
-      key: 'feel',
-      title: t('how_feel'),
-      meta:
-        today.symptomsToday && today.lastSymptomTsMs !== null
-          ? `${todayWord}, ${clock(today.lastSymptomTsMs, lang)}`
-          : t('not_yet_today'),
-      to: '/symptoms',
-      done: today.symptomsToday,
-    },
-    {
-      key: 'checkin',
-      title: t('checkin_title'),
-      meta: checkInDone ? todayWord : t('not_yet_today'),
-      to: '/check-in',
-      done: checkInDone,
-    },
-    {
-      key: 'epds',
-      title: t('epds_title'),
-      meta: epdsMeta
-        ? lang === 'sw'
-          ? `Mwisho ${epdsMeta}`
-          : `Last ${epdsMeta}`
-        : t('epds_sub'),
-      to: '/epds',
-      done: Boolean(epdsMeta),
-    },
-    {
-      key: 'birth',
-      title: t('birth_plan_row'),
-      meta:
-        birthReady === null
-          ? t('not_yet_today')
-          : lang === 'sw'
-            ? `${birthReady}/5 tayari`
-            : `${birthReady}/5 ready`,
-      to: '/passport',
-      done: birthReady === 5,
-    },
-    { key: 'band', title: t('band'), meta: bandMeta, to: '/vitals', icon: <IconBand /> },
-    { key: 'nurse', title: t('nurse_title'), meta: t('nurse_sub'), to: '/summary', icon: <IconQr /> },
-  ];
+  const hr = g.connected ? (g.sample?.heartRate ?? null) : null;
+  const temp = g.connected ? displayTemp(g.sample) : null;
+  const bp = today.lastBp;
+  const hrBand = trend.hr.range;
 
-  if (openLoops > 0) {
-    rows.unshift({
-      key: 'chase',
-      title: t('chase_title'),
-      meta: t('chase_open'),
-      to: '/chase',
-      icon: <IconBell />,
-    });
+  let hrTone: KpiTone = 'muted';
+  if (hr !== null) {
+    if (g.triage?.reasons.some((r) => r.includes('pulse'))) hrTone = level === 'RED' ? 'alert' : 'watch';
+    else if (hrBand && (hr < hrBand.low || hr > hrBand.high)) hrTone = 'watch';
+    else hrTone = 'calm';
   }
+
+  let tempTone: KpiTone = 'muted';
+  if (temp !== null) {
+    if (g.triage?.reasons.some((r) => r.includes('fever'))) tempTone = level === 'RED' ? 'alert' : 'watch';
+    else tempTone = temp >= 38 ? 'watch' : 'calm';
+  }
+
+  let bpTone: KpiTone = 'muted';
+  if (bp) {
+    if (bp.systolic >= 160 || bp.diastolic >= 110) bpTone = 'alert';
+    else if (bp.systolic >= 140 || bp.diastolic >= 90) bpTone = 'watch';
+    else bpTone = 'calm';
+  }
+
+  const hrSpark = sparkFromValues(
+    trend.minutes.map((m) => m.hrMean),
+    50,
+    140,
+  );
+  const tempSpark = sparkFromValues(
+    trend.minutes.map((m) => m.tempMeanC),
+    35.5,
+    39,
+  );
+  const bpSpark = bp
+    ? sparkFromValues([bp.systolic - 20, bp.systolic - 8, bp.systolic - 4, bp.systolic - 2, bp.systolic], 90, 180)
+    : [];
 
   return (
     <main className="screen screen--home">
@@ -253,40 +182,74 @@ export function HomePage() {
         </div>
       </header>
 
-      <div className="home-grid">
-        <section>
-          <div className="greet">
-            <div>
-              <h1 className="greet__title">
-                {t(greetingKey(new Date().getHours()))}, {name}
-              </h1>
-              <p className="greet__sub">{t('greet_sub')}</p>
-            </div>
-            <button
-              type="button"
-              className="avatar"
-              aria-label={t('your_passport')}
-              onClick={() => nav('/passport')}
-            >
-              {name.charAt(0).toUpperCase()}
-            </button>
+      <div className="bento__head">
+        <div className="greet">
+          <div>
+            <h1 className="greet__title">
+              {t(greetingKey(new Date().getHours()))}, {name}
+            </h1>
+            <p className="greet__sub">{t('greet_sub')}</p>
           </div>
+        </div>
+        <button
+          type="button"
+          className="avatar"
+          aria-label={t('your_passport')}
+          onClick={() => nav('/passport')}
+        >
+          {name.charAt(0).toUpperCase()}
+        </button>
+      </div>
 
-          <AvatarCompanion state={companion} lang={lang} />
+      <div className="bento">
+        <div className="bento__kpis" role="group" aria-label={lang === 'sw' ? 'Vipimo' : 'Readings'}>
+          <KpiTile
+            label={lang === 'sw' ? 'Mapigo' : 'Heart'}
+            value={hr === null ? '—' : String(Math.round(hr))}
+            unit={hr === null ? undefined : 'bpm'}
+            note={
+              hr === null
+                ? bandMeta
+                : hrBand
+                  ? `${Math.round(hrBand.low)}–${Math.round(hrBand.high)}`
+                  : lang === 'sw'
+                    ? 'Inajifunza'
+                    : 'Learning'
+            }
+            tone={hrTone}
+            spark={hrSpark}
+            icon={<IconHeart />}
+            onClick={() => nav('/vitals')}
+          />
+          <KpiTile
+            label={lang === 'sw' ? 'Shinikizo' : 'BP'}
+            value={bp ? String(bp.systolic) : '—'}
+            unit={bp ? `/${bp.diastolic}` : undefined}
+            note={
+              bp
+                ? clock(bp.tsMs, lang)
+                : lang === 'sw'
+                  ? 'Ongeza'
+                  : 'Add one'
+            }
+            tone={bpTone}
+            spark={bpSpark}
+            icon={<IconPressure />}
+            onClick={() => nav('/bp')}
+          />
+          <KpiTile
+            label={lang === 'sw' ? 'Joto' : 'Temp'}
+            value={temp === null ? '—' : temp.toFixed(1)}
+            unit={temp === null ? undefined : '°'}
+            note={lang === 'sw' ? 'Homa ≥38°' : 'Fever ≥38°'}
+            tone={tempTone}
+            spark={tempSpark}
+            icon={<IconTemp />}
+            onClick={() => nav('/vitals')}
+          />
+        </div>
 
-          {g.triage && alertActive ? (
-            <SigningSlot messageKey={g.triage.messageKey} lang={lang} />
-          ) : null}
-
-          <button
-            type="button"
-            className="btn btn-ghost"
-            style={{ width: '100%', marginBottom: '0.5rem' }}
-            onClick={() => nav('/sign')}
-          >
-            {lang === 'sw' ? 'Zungumza kwa ishara (mstari kwa mstari)' : 'Talk in sign (line by line)'}
-          </button>
-
+        <div className="bento__main">
           <div className="hero-card" data-level={level} aria-live="polite">
             <span className="hero-card__pill">
               <i className="hero-card__dot" aria-hidden />
@@ -319,15 +282,12 @@ export function HomePage() {
             ) : null}
           </div>
 
-          {alertActive ? (
-            <button
-              type="button"
-              className="btn btn-ghost"
-              style={{ width: '100%', marginTop: '0.5rem' }}
-              onClick={() => nav('/alert')}
-            >
-              {lang === 'sw' ? 'Ona hatua zote' : 'See all steps'}
-            </button>
+          <TonightCard lang={lang} sample={g.sample} connected={g.connected} trend={trend} />
+        </div>
+
+        <aside className="bento__side">
+          {g.triage && alertActive ? (
+            <SigningSlot messageKey={g.triage.messageKey} lang={lang} />
           ) : null}
 
           {today.hasRealChp === false ? (
@@ -335,7 +295,7 @@ export function HomePage() {
               type="button"
               className="panel contact-warning"
               data-testid="no-chp-warning"
-              style={{ width: '100%', textAlign: 'left', marginTop: '0.75rem', cursor: 'pointer', font: 'inherit' }}
+              style={{ width: '100%', textAlign: 'left', cursor: 'pointer', font: 'inherit' }}
               onClick={() => nav('/contacts?setup=1')}
             >
               <strong>{lang === 'sw' ? 'Hakuna namba ya CHP' : 'No CHP number saved'}</strong>
@@ -357,55 +317,22 @@ export function HomePage() {
               void g.pressSos().then(() => nav('/alert'));
             }}
           />
+        </aside>
 
-          <VitalRings
-            lang={lang}
-            sample={g.sample}
-            connected={g.connected}
-            trend={trend}
-            triage={g.triage}
-            lastBp={today.lastBp}
-            stage={g.stage}
-            gestationWeeks={today.gestationWeeks}
-            show={['hr', 'temp', 'bp', 'weeks', 'signal']}
-            onOpen={(key) => nav(key === 'bp' ? '/bp' : key === 'weeks' ? '/passport' : '/vitals')}
-          />
-
-          <TonightCard lang={lang} sample={g.sample} connected={g.connected} trend={trend} />
-        </section>
-
-        <section>
-          <h2 className="section-title">{todayWord}</h2>
-          <ul className="check-list">
-            {rows.map((row) => (
-              <li key={row.key}>
-                <button
-                  type="button"
-                  className="check-row"
-                  data-done={row.done === true}
-                  onClick={() => nav(row.to)}
-                >
-                  {row.icon ? (
-                    <span className="check-row__mark check-row__mark--icon">{row.icon}</span>
-                  ) : (
-                    <span className="check-row__mark">
-                      <IconCheck />
-                    </span>
-                  )}
-                  <span>
-                    <span className="check-row__title">{row.title}</span>
-                    <span className="check-row__meta">{row.meta}</span>
-                  </span>
-                  <span className="check-row__chev">
-                    <IconChevron />
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
+        <div className="bento__checks">
           <TrendCard lang={lang} trend={trend} />
+          {alertActive ? (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{ width: '100%', marginTop: '0.75rem' }}
+              onClick={() => nav('/alert')}
+            >
+              {lang === 'sw' ? 'Ona hatua zote' : 'See all steps'}
+            </button>
+          ) : null}
           <p className="trust-line">{t('saved_here')}</p>
-        </section>
+        </div>
       </div>
     </main>
   );

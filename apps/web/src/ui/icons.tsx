@@ -152,3 +152,81 @@ export function IconAlert() {
     </Svg>
   );
 }
+
+export function IconList() {
+  return (
+    <Svg>
+      <path d="M9 7h10M9 12h10M9 17h10" />
+      <path d="M5 7h.01M5 12h.01M5 17h.01" />
+    </Svg>
+  );
+}
+
+export function IconChat() {
+  return (
+    <Svg>
+      <path d="M5 7.5A3.5 3.5 0 0 1 8.5 4h7A3.5 3.5 0 0 1 19 7.5v5A3.5 3.5 0 0 1 15.5 16H10l-4 3.2V16H8.5A3.5 3.5 0 0 1 5 12.5v-5Z" />
+    </Svg>
+  );
+}
+
+export function IconSend() {
+  return (
+    <Svg>
+      <path d="M4.5 11.5 19 5l-5.5 15-2.2-6.3L4.5 11.5Z" />
+    </Svg>
+  );
+}
+
+export function IconDots() {
+  return (
+    <Svg>
+      <circle cx="6" cy="12" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="12" r="1.2" fill="currentColor" stroke="none" />
+    </Svg>
+  );
+}
+
+export function IconSpark() {
+  return (
+    <Svg>
+      <path d="M12 4.5v3.2M12 16.3v3.2M4.5 12h3.2M16.3 12h3.2M7.1 7.1l2.2 2.2M14.7 14.7l2.2 2.2M16.9 7.1l-2.2 2.2M9.3 14.7l-2.2 2.2" />
+    </Svg>
+  );
+}
+
+export function IconCopy() {
+  return (
+    <Svg>
+      <rect x="8" y="8" width="10" height="12" rx="2" />
+      <path d="M6 16V6a2 2 0 0 1 2-2h8" />
+    </Svg>
+  );
+}
+
+export function IconThumb() {
+  return (
+    <Svg>
+      <path d="M8 11v9M8 11H5.5A1.5 1.5 0 0 0 4 12.5V18a1.5 1.5 0 0 0 1.5 1.5H8M8 11l2.2-5.2A1.8 1.8 0 0 1 11.9 4.8c.9 0 1.6.7 1.6 1.6V11h4.2a2 2 0 0 1 2 2.3l-1 6A2 2 0 0 1 16.7 21H8" />
+    </Svg>
+  );
+}
+
+export function IconSpeaker() {
+  return (
+    <Svg>
+      <path d="M4 10v4h3l4 3V7L7 10H4Z" />
+      <path d="M15.5 9.5a3.2 3.2 0 0 1 0 5M17.8 7.2a6 6 0 0 1 0 9.6" />
+    </Svg>
+  );
+}
+
+export function IconRefresh() {
+  return (
+    <Svg>
+      <path d="M19 8.5A7 7 0 1 0 19.5 14" />
+      <path d="M19 4.5v4h-4" />
+    </Svg>
+  );
+}

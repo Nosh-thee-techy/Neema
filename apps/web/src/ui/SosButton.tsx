@@ -79,11 +79,11 @@ export function SosButton({ lang, onTrigger }: SosButtonProps) {
         <small>
           {progress >= 1
             ? lang === 'sw'
-              ? 'Msaada unaitwa…'
-              : 'Calling for help…'
+              ? 'Inaitwa…'
+              : 'Calling…'
             : lang === 'sw'
-              ? 'Shikilia sekunde 2'
-              : 'Hold for 2 seconds'}
+              ? 'Shikilia 2s'
+              : 'Hold 2s'}
         </small>
       </span>
     </button>

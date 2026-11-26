@@ -149,7 +149,8 @@ export function ContactsPage() {
           : 'When something is wrong, Neema prepares an SMS for your CHP first, then family, then the CHP supervisor.'}
       </p>
 
-      <div className="summary-row">
+      <div className="bento">
+      <div className="bento__kpis summary-row" role="group" aria-label={sw ? 'Muhtasari' : 'Summary'}>
         <div className="summary-tile">
           <b>{items.length}</b>
           <span>{sw ? 'Watu' : 'People'}</span>
@@ -164,6 +165,8 @@ export function ContactsPage() {
         </div>
       </div>
 
+      <div className="bento__main" style={{ gridTemplateColumns: adding ? undefined : '1fr' }}>
+      <div>
       {placeholders.length > 0 ? (
         <div className="panel contact-warning" role="alert" style={{ marginBottom: '1rem' }}>
           <strong>{sw ? 'Namba za mfano' : 'Sample numbers'}</strong>
@@ -240,6 +243,8 @@ export function ContactsPage() {
             </div>
           );
         })}
+      </div>
+
       </div>
 
       {adding ? (
@@ -334,11 +339,12 @@ export function ContactsPage() {
           </div>
         </div>
       ) : null}
+      </div>
 
       {setup ? (
-        <div style={{ marginTop: '1rem' }}>
+        <div className="bento__side">
           {!hasRealFamily && hasRealChp ? (
-            <p className="soft-note" style={{ textAlign: 'center' }}>
+            <p className="soft-note" style={{ textAlign: 'center', margin: 0 }}>
               {sw
                 ? 'Ongeza mtu wa familia pia: mara nyingi wao ndio huamua usiku.'
                 : 'Add a family member too: they often decide at night.'}
@@ -346,17 +352,18 @@ export function ContactsPage() {
           ) : null}
           <Button
             variant="primary"
-            style={{ width: '100%', marginTop: '0.5rem' }}
+            style={{ width: '100%' }}
             disabled={!hasRealChp}
             onClick={() => nav('/talk')}
           >
             {sw ? 'Endelea' : 'Continue'}
           </Button>
-          <Button variant="ghost" style={{ width: '100%', marginTop: '0.5rem' }} onClick={() => nav('/talk')}>
+          <Button variant="ghost" style={{ width: '100%' }} onClick={() => nav('/talk')}>
             {sw ? 'Baadaye' : 'Later'}
           </Button>
         </div>
       ) : null}
+      </div>
     </main>
   );
 }

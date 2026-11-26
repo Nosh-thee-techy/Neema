@@ -184,7 +184,7 @@ export function TonightCard({ lang, sample, connected, trend }: TonightProps) {
   return (
     <section className="tonight" aria-label={sw(lang, 'Usiku huu', 'Tonight')}>
       <header className="tonight__head">
-        <span className="tonight__eyebrow">{sw(lang, 'Usiku huu', 'Tonight')}</span>
+        <h2 className="tonight__title">{sw(lang, 'Usiku huu', 'Tonight')}</h2>
         <span className="tonight__live" data-on={hr !== null}>
           {hr !== null ? sw(lang, 'Moja kwa moja', 'Live') : sw(lang, 'Imesimama', 'Paused')}
         </span>
@@ -241,23 +241,26 @@ interface TrendProps {
   windowMinutes?: number;
 }
 
-/** Trend card with a heart rate / temperature switch. */
+/** Trend card with a heart rate / temperature switch — last-hour chart. */
 export function TrendCard({ lang, trend, windowMinutes = 60 }: TrendProps) {
   const [signal, setSignal] = useState<'hr' | 'temp'>('hr');
   const now = Date.now();
+  const band = signal === 'hr' ? trend.hr.range : trend.temp.range;
   const points =
     signal === 'hr'
       ? trend.minutes.filter((m) => m.hrMean !== null).map((m) => ({ tsMs: m.tsMs, value: m.hrMean as number }))
       : trend.minutes.filter((m) => m.tempMeanC !== null).map((m) => ({ tsMs: m.tsMs, value: m.tempMeanC as number }));
 
   return (
-    <section className="trend-card panel">
+    <section className="trend-card panel" aria-label={signal === 'hr' ? sw(lang, 'Mapigo ya moyo', 'Heart rate') : sw(lang, 'Joto', 'Temperature')}>
       <header className="trend-card__head">
-        <div>
+        <div className="trend-card__intro">
           <h2 className="trend-card__title">
             {signal === 'hr' ? sw(lang, 'Mapigo ya moyo', 'Heart rate') : sw(lang, 'Joto', 'Temperature')}
           </h2>
-          <p className="soft-note">{sw(lang, `Dakika ${windowMinutes} zilizopita`, `Last ${windowMinutes} minutes`)}</p>
+          <p className="trend-card__sub soft-note">
+            {sw(lang, `Dakika ${windowMinutes} zilizopita`, `Last ${windowMinutes} minutes`)}
+          </p>
         </div>
         <div className="segmented" role="group" aria-label={sw(lang, 'Chagua kipimo', 'Choose reading')}>
           <button type="button" aria-pressed={signal === 'hr'} onClick={() => setSignal('hr')}>
@@ -272,7 +275,7 @@ export function TrendCard({ lang, trend, windowMinutes = 60 }: TrendProps) {
         points={points}
         windowMinutes={windowMinutes}
         nowMs={now}
-        band={signal === 'hr' ? trend.hr.range : trend.temp.range}
+        band={band}
         limit={signal === 'temp' ? { value: config.fever.tempC, label: sw(lang, 'homa', 'fever') } : null}
         yMin={signal === 'hr' ? 60 : 36}
         yMax={signal === 'hr' ? 100 : 38.5}
@@ -282,8 +285,8 @@ export function TrendCard({ lang, trend, windowMinutes = 60 }: TrendProps) {
         ariaLabel={signal === 'hr' ? sw(lang, 'Grafu ya mapigo ya moyo', 'Heart rate chart') : sw(lang, 'Grafu ya joto', 'Temperature chart')}
       />
       <p className="trend-card__legend">
-        <span className="trend-card__swatch" />
-        {(signal === 'hr' ? trend.hr.range : trend.temp.range)
+        <span className="trend-card__swatch" aria-hidden />
+        {band
           ? sw(lang, 'Eneo la kijani: kawaida yako', 'Green band: your normal')
           : sw(lang, 'Kawaida yako itaonekana baada ya siku 3', 'Your normal appears after 3 days')}
       </p>
