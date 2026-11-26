@@ -24,7 +24,7 @@ export function SignSessionPage() {
   return (
     <SignSession
       lang={lang}
-      onLeave={() => nav(-1)}
+      onLeave={() => nav('/talk')}
       onHandoff={onHandoff}
     />
   );

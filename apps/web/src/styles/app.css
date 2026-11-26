@@ -253,11 +253,13 @@
 .field textarea {
   min-height: 54px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--glass-edge, var(--line));
+  background: rgba(255, 255, 255, 0.38);
   color: var(--ink);
   padding: 0.75rem 1rem;
   transition: border-color 160ms ease, box-shadow 160ms ease;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .field input:focus,
@@ -1184,6 +1186,11 @@ input[type='checkbox'] {
     padding: 2rem 2rem calc(7.5rem + var(--safe-bottom));
   }
 
+  .screen--wide,
+  .screen--home {
+    width: min(920px, calc(100% - 2.5rem));
+  }
+
   .bottom-nav {
     width: min(520px, calc(100% - 2rem));
   }
@@ -1232,12 +1239,17 @@ input[type='checkbox'] {
   }
 
   .screen {
-    width: min(var(--stage-laptop), 100%);
+    width: min(var(--stage-laptop), calc(100% - 3rem));
     padding: 2.25rem 2.5rem 3rem;
   }
 
-  .screen:not(.screen--home) {
-    width: min(var(--stage-tablet), 100%);
+  .screen--wide,
+  .screen--home {
+    width: min(1120px, calc(100% - 4rem));
+  }
+
+  .screen:not(.screen--home):not(.screen--wide) {
+    width: min(840px, calc(100% - 3rem));
   }
 
   .bottom-nav {
@@ -1608,32 +1620,32 @@ input[type='checkbox'] {
   font-weight: 600;
   color: var(--ink);
 }
-.sign-session__chapters {
-  margin-top: 0.35rem;
-}
-.sign-session__chapter-list {
+/* After unlock: pick sign vs written language */
+.talk-mode__choices {
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
+  gap: 0.85rem;
+  margin-top: 1.25rem;
 }
-.sign-session__chapter {
+.talk-mode__choice {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.2rem;
+  gap: 0.35rem;
   width: 100%;
   min-height: auto;
-  padding: 0.9rem 1rem;
+  padding: 1.1rem 1.15rem;
   text-align: left;
   white-space: normal;
   line-height: 1.35;
 }
-.sign-session__chapter-title {
-  font-size: 1.05rem;
+.talk-mode__choice-title {
+  font-family: var(--font-display, Georgia, 'Times New Roman', serif);
+  font-size: 1.25rem;
   font-weight: 700;
 }
-.sign-session__chapter-blurb {
-  font-size: 0.9rem;
+.talk-mode__choice-blurb {
+  font-size: 0.92rem;
   font-weight: 500;
-  opacity: 0.92;
+  opacity: 0.9;
 }

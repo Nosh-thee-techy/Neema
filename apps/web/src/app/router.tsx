@@ -20,6 +20,7 @@ import { CheckInPage } from '../pages/CheckInPage';
 import { EpdsPage } from '../pages/EpdsPage';
 import { SignOffPage } from '../pages/SignOffPage';
 import { SignSessionPage } from '../pages/SignSessionPage';
+import { TalkModePage } from '../pages/TalkModePage';
 import { LocaleProvider } from '../hooks/useLocale';
 import { LandingPage } from '../pages/LandingPage';
 
@@ -39,6 +40,14 @@ export function AppRouter() {
             <Route path="/orient" element={<OrientationPage />} />
             <Route path="/consent" element={<ConsentPage />} />
             <Route path="/unlock" element={<UnlockPage />} />
+            <Route
+              path="/talk"
+              element={
+                <RequireAuth>
+                  <TalkModePage />
+                </RequireAuth>
+              }
+            />
             <Route
               path="/home"
               element={

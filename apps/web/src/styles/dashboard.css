@@ -26,7 +26,7 @@
   --ring-b: #8fd9b6;
   appearance: none;
   border: 1px solid var(--glass-edge);
-  background: var(--surface);
+  background: var(--glass-strong);
   border-radius: 20px;
   padding: 0.75rem 0.5rem 0.7rem;
   display: grid;
@@ -36,6 +36,8 @@
   font: inherit;
   scroll-snap-align: start;
   box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(var(--glass-blur, 18px)) saturate(1.15);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(1.15);
   cursor: default;
   min-width: 0;
 }
@@ -478,10 +480,12 @@ button.ring:focus-visible {
 
 .summary-tile {
   border-radius: 18px;
-  background: var(--surface);
+  background: var(--glass-strong);
   border: 1px solid var(--glass-edge);
   padding: 0.75rem 0.8rem;
   box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(var(--glass-blur, 18px)) saturate(1.15);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(1.15);
 }
 
 .summary-tile b {
@@ -520,8 +524,8 @@ button.ring:focus-visible {
 
 .filter-row button {
   appearance: none;
-  border: 1px solid var(--line);
-  background: var(--surface);
+  border: 1px solid var(--glass-edge);
+  background: var(--glass);
   color: var(--ink);
   border-radius: 999px;
   min-height: 38px;
@@ -531,6 +535,8 @@ button.ring:focus-visible {
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .filter-row button[aria-pressed='true'] {
@@ -548,9 +554,11 @@ button.ring:focus-visible {
 
 .people {
   border-radius: 22px;
-  background: var(--surface);
+  background: var(--glass-strong);
   border: 1px solid var(--glass-edge);
   box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(var(--glass-blur, 18px)) saturate(1.15);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(1.15);
   overflow: hidden;
 }
 
@@ -708,6 +716,15 @@ button.ring:focus-visible {
   animation: rise 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.add-panel__head {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.add-panel__voice-hint {
+  margin: 0;
+}
+
 .add-panel__roles {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -716,8 +733,8 @@ button.ring:focus-visible {
 
 .add-panel__roles button {
   appearance: none;
-  border: 1px solid var(--line);
-  background: var(--surface);
+  border: 1px solid var(--glass-edge);
+  background: var(--glass);
   border-radius: 14px;
   min-height: 48px;
   font: inherit;
@@ -725,6 +742,65 @@ button.ring:focus-visible {
   font-weight: 600;
   color: var(--ink);
   cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.field__control {
+  position: relative;
+  display: grid;
+}
+
+.field__control input {
+  padding-right: 3.25rem;
+}
+
+.field__mic {
+  appearance: none;
+  position: absolute;
+  right: 0.45rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-edge);
+  background: var(--glass);
+  color: var(--primary);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.field__mic svg {
+  width: 20px;
+  height: 20px;
+}
+
+.field__mic[aria-pressed='true'] {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(90, 128, 191, 0.22);
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes mic-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(90, 128, 191, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(90, 128, 191, 0.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .field__mic[aria-pressed='true'] {
+    animation: none;
+  }
 }
 
 .add-panel__roles button[aria-pressed='true'] {

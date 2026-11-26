@@ -6,8 +6,9 @@ import { Button } from '../ui/Button';
 import { deleteContact, listContacts, saveContact } from '../services/contacts';
 import { firstRecipients } from '../services/alerts';
 import { LoadingScreen } from '../ui/LoadingScreen';
-import { IconPlus } from '../ui/icons';
+import { IconMic, IconPlus } from '../ui/icons';
 import { useLocale } from '../hooks/useLocale';
+import { useSpeechDictation } from '../hooks/useSpeechDictation';
 
 const ROLE_LABEL: Record<Contact['role'], { en: string; sw: string }> = {
   chp: { en: 'CHP', sw: 'CHP' },
@@ -41,6 +42,8 @@ export function ContactsPage() {
   const [role, setRole] = useState<Contact['role']>('chp');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
+  const [voiceTarget, setVoiceTarget] = useState<'name' | 'phone' | null>(null);
+  const voice = useSpeechDictation(lang);
 
   const placeholders = items.filter((c) => isPlaceholderPhone(c.phone));
   const usable = items.filter((c) => !isPlaceholderPhone(c.phone));
@@ -108,8 +111,24 @@ export function ContactsPage() {
     await refresh();
   }
 
+  async function dictate(target: 'name' | 'phone') {
+    if (voice.listening) {
+      voice.stop();
+      setVoiceTarget(null);
+      return;
+    }
+    setError(null);
+    voice.clearError();
+    setVoiceTarget(target);
+    const heard = await voice.listen({ mode: target === 'phone' ? 'phone' : 'text' });
+    setVoiceTarget(null);
+    if (!heard) return;
+    if (target === 'name') setName(heard);
+    else setPhone(heard);
+  }
+
   return (
-    <main className="screen">
+    <main className="screen screen--wide">
       {busy ? <LoadingScreen /> : null}
       <BrandMark />
 
@@ -224,24 +243,67 @@ export function ContactsPage() {
       </div>
 
       {adding ? (
-        <div className="panel add-panel">
-          <strong>
-            {role === 'chp' && !hasRealChp ? (sw ? 'Ongeza CHP wako' : 'Add your CHP') : sw ? 'Ongeza mtu' : 'Add someone'}
-          </strong>
-          <div className="field" style={{ marginTop: '0.6rem' }}>
-            <label htmlFor="cname">{sw ? 'Jina' : 'Name'}</label>
-            <input id="cname" value={name} autoComplete="off" onChange={(e) => setName(e.target.value)} />
+        <div className="panel add-panel glass-panel">
+          <div className="add-panel__head">
+            <strong>
+              {role === 'chp' && !hasRealChp ? (sw ? 'Ongeza CHP wako' : 'Add your CHP') : sw ? 'Ongeza mtu' : 'Add someone'}
+            </strong>
+            {voice.supported ? (
+              <p className="soft-note add-panel__voice-hint">
+                {voice.listening
+                  ? voiceTarget === 'phone'
+                    ? sw
+                      ? 'Sema namba ya simu…'
+                      : 'Say the phone number…'
+                    : sw
+                      ? 'Sema jina…'
+                      : 'Say the name…'
+                  : sw
+                    ? 'Gusa mikrofoni kujaza kwa sauti.'
+                    : 'Tap the mic to fill by voice.'}
+              </p>
+            ) : null}
           </div>
-          <div className="field">
+          <div className="field field--voice" style={{ marginTop: '0.6rem' }}>
+            <label htmlFor="cname">{sw ? 'Jina' : 'Name'}</label>
+            <div className="field__control">
+              <input id="cname" value={name} autoComplete="off" onChange={(e) => setName(e.target.value)} />
+              {voice.supported ? (
+                <button
+                  type="button"
+                  className="field__mic"
+                  aria-pressed={voice.listening && voiceTarget === 'name'}
+                  aria-label={sw ? 'Sema jina' : 'Speak the name'}
+                  onClick={() => void dictate('name')}
+                >
+                  <IconMic />
+                </button>
+              ) : null}
+            </div>
+          </div>
+          <div className="field field--voice">
             <label htmlFor="cphone">{sw ? 'Namba ya simu' : 'Phone number'}</label>
-            <input
-              id="cphone"
-              type="tel"
-              inputMode="tel"
-              placeholder="0712 345 678"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
+            <div className="field__control">
+              <input
+                id="cphone"
+                type="tel"
+                inputMode="tel"
+                placeholder="0712 345 678"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+              {voice.supported ? (
+                <button
+                  type="button"
+                  className="field__mic"
+                  aria-pressed={voice.listening && voiceTarget === 'phone'}
+                  aria-label={sw ? 'Sema namba ya simu' : 'Speak the phone number'}
+                  onClick={() => void dictate('phone')}
+                >
+                  <IconMic />
+                </button>
+              ) : null}
+            </div>
           </div>
           <div className="field">
             <span className="field__label" id="crole-label">
@@ -255,9 +317,9 @@ export function ContactsPage() {
               ))}
             </div>
           </div>
-          {error ? (
+          {error || voice.error ? (
             <p className="field-error" role="alert">
-              {error}
+              {error ?? voice.error}
             </p>
           ) : null}
           <div className="btn-row" style={{ marginTop: '0.5rem' }}>
@@ -286,11 +348,11 @@ export function ContactsPage() {
             variant="primary"
             style={{ width: '100%', marginTop: '0.5rem' }}
             disabled={!hasRealChp}
-            onClick={() => nav('/home')}
+            onClick={() => nav('/talk')}
           >
             {sw ? 'Endelea' : 'Continue'}
           </Button>
-          <Button variant="ghost" style={{ width: '100%', marginTop: '0.5rem' }} onClick={() => nav('/home')}>
+          <Button variant="ghost" style={{ width: '100%', marginTop: '0.5rem' }} onClick={() => nav('/talk')}>
             {sw ? 'Baadaye' : 'Later'}
           </Button>
         </div>

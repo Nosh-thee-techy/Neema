@@ -28,8 +28,9 @@ export function UnlockPage() {
       if (mode === 'set') await setPin(pin);
       else await unlockWithPin(pin);
       // First-time setup: ask who to alert before anything else.
+      // Then pick sign vs text language (talk mode).
       const { hasRealChp } = await contactReadiness();
-      nav(mode === 'set' && !hasRealChp ? '/contacts?setup=1' : '/home');
+      nav(mode === 'set' && !hasRealChp ? '/contacts?setup=1' : '/talk');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {

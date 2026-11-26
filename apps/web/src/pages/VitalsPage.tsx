@@ -34,7 +34,7 @@ export function VitalsPage() {
   else if (g.connected) presence = t('waiting_signal');
 
   return (
-    <main className="screen">
+    <main className="screen screen--wide">
       {g.loading ? <LoadingScreen message={t('waiting_signal')} /> : null}
       <BrandMark />
       <h1 className="screen-title" style={{ marginTop: '1rem' }}>
