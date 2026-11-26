@@ -142,8 +142,8 @@ export function SignSession({
         </header>
         <p className="soft-note" style={{ marginTop: '0.75rem' }}>
           {lang === 'sw'
-            ? 'Chagua mazungumzo. Klipu ni utafiti wa ASL (How2Sign) — si KSL, si ujumbe wa kliniki. Mtu wa 3D ni passport.'
-            : 'Pick a conversation. Clips are How2Sign research ASL — not KSL, not clinical messaging. The figure is a passport 3D woman.'}
+            ? 'Chagua mazungumzo. Klipu ni utafiti wa ASL (How2Sign) — si KSL, si ujumbe wa kliniki.'
+            : 'Pick a conversation. Clips are How2Sign research ASL — not KSL, not clinical messaging.'}
         </p>
         <section className="sign-session__chapters" aria-labelledby="sign-chapter-heading">
           <h2 id="sign-chapter-heading" className="section-title">
@@ -234,7 +234,6 @@ export function SignSession({
           clipId={clipId}
           tall
           passport
-          prefer3d
           showCaption={false}
           paused={paused}
           speed={slow ? ASL_PLAYBACK_RATE * 0.65 : ASL_PLAYBACK_RATE}

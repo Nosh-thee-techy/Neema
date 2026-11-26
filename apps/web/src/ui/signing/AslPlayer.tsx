@@ -1,6 +1,6 @@
 /**
- * Plays a How2Sign pose packet. Prefers passport 3D (Three.js); falls back to canvas.
- * Research demo only — not KSL.
+ * Plays a How2Sign pose packet with the passport canvas woman (paintWoman).
+ * Research demo only — not KSL. Procedural Three.js rig stays opt-in only.
  */
 
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
@@ -44,7 +44,7 @@ export function AslPlayer({
   replay = 0,
   tall = false,
   passport = false,
-  prefer3d = true,
+  prefer3d = false,
   showCaption = true,
   onLine,
   onProblem,
@@ -58,7 +58,7 @@ export function AslPlayer({
   tall?: boolean;
   /** Passport-card framing (chest-up portrait). */
   passport?: boolean;
-  /** Try WebGL woman first; canvas fallback if WebGL fails. */
+  /** Opt-in WebGL capsule rig — off by default; canvas woman looks more human. */
   prefer3d?: boolean;
   showCaption?: boolean;
   onLine?: (line: SignedLine | null) => void;
