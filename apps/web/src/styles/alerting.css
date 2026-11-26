@@ -17,3 +17,205 @@
   font-size: 0.85rem;
   margin-top: 0.3rem;
 }
+
+/* Interactive alert ritual */
+.alert-page[data-mounted='true'] .alert-card,
+.alert-page[data-mounted='true'] .ritual-steps,
+.alert-page[data-mounted='true'] .sms-list,
+.alert-page[data-mounted='true'] .ack-group,
+.alert-page[data-mounted='true'] .alert-page__tools {
+  animation: alert-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.alert-page[data-mounted='true'] .ritual-steps {
+  animation-delay: 60ms;
+}
+
+.alert-page[data-mounted='true'] .sms-list,
+.alert-page[data-mounted='true'] .alert-card--action {
+  animation-delay: 140ms;
+}
+
+.alert-page[data-mounted='true'] .ack-group {
+  animation-delay: 220ms;
+}
+
+.alert-card {
+  margin: 0.75rem 0;
+  border-radius: 22px;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.alert-card--action {
+  box-shadow: 0 14px 32px rgba(29, 39, 64, 0.08);
+}
+
+.alert-card--ok {
+  border-color: color-mix(in srgb, var(--ok, #1f9d74) 40%, transparent);
+  background: color-mix(in srgb, var(--ok, #1f9d74) 10%, white);
+}
+
+.alert-card--pop {
+  animation: alert-pop 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.alert-cta {
+  position: relative;
+  overflow: hidden;
+  touch-action: manipulation;
+  transition:
+    transform 0ms linear,
+    box-shadow 160ms ease,
+    filter 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.alert-cta:active {
+  transform: scale(0.985);
+}
+
+.alert-cta:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.alert-cta--pulse {
+  animation: alert-cta-pulse 1.8s ease-in-out infinite;
+}
+
+.alert-cta--pulse:active {
+  animation: none;
+}
+
+.alert-cta__label {
+  display: inline-block;
+}
+
+.alert-cta__toast {
+  position: absolute;
+  right: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1d2740;
+  animation: alert-toast-in 280ms ease both;
+}
+
+.alert-cta[data-flash='true'] {
+  filter: brightness(1.05);
+}
+
+.alert-cta[data-opened='true'] {
+  opacity: 0.88;
+}
+
+.ritual-steps li {
+  transition:
+    background-color 220ms ease,
+    border-color 220ms ease,
+    transform 220ms ease;
+}
+
+.ritual-steps li[data-current='true'] {
+  background: color-mix(in srgb, var(--primary) 8%, white);
+  border-color: color-mix(in srgb, var(--primary) 28%, transparent);
+  transform: translateX(2px);
+}
+
+.ritual-steps li[data-done='true'] .step-n {
+  background: color-mix(in srgb, var(--ok, #1f9d74) 85%, #1d2740);
+  color: #fff;
+}
+
+.ritual-steps li[data-current='true'] .step-n {
+  animation: alert-step-glow 1.6s ease-in-out infinite;
+}
+
+.ack-group {
+  margin-top: 1.1rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.ack-group__note {
+  text-align: center;
+  margin: 0 0 0.15rem;
+}
+
+.alert-countdown {
+  text-align: center;
+  margin-top: 0.65rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes alert-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes alert-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes alert-cta-pulse {
+  0%,
+  100% {
+    box-shadow: 0 10px 24px rgba(193, 58, 82, 0.28);
+  }
+  50% {
+    box-shadow: 0 14px 34px rgba(193, 58, 82, 0.48);
+  }
+}
+
+@keyframes alert-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(8px, -50%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, -50%);
+  }
+}
+
+@keyframes alert-step-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(29, 39, 64, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(29, 39, 64, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alert-page[data-mounted='true'] .alert-card,
+  .alert-page[data-mounted='true'] .ritual-steps,
+  .alert-page[data-mounted='true'] .sms-list,
+  .alert-page[data-mounted='true'] .ack-group,
+  .alert-page[data-mounted='true'] .alert-page__tools,
+  .alert-cta--pulse,
+  .ritual-steps li[data-current='true'] .step-n,
+  .alert-card--pop,
+  .escalation-notice {
+    animation: none !important;
+  }
+}
