@@ -1,10 +1,13 @@
 /**
  * CareLoop patient-card pattern: signed line → tap answers → next line.
- * One continuous night guide — no chapter menu. Camera stays off.
- * Clips are How2Sign research ASL, not KSL.
+ * Shell matches the animated assistant home (orb + glass actions).
+ * Clips are How2Sign research ASL, not KSL. Camera stays off.
  */
 
 import { useCallback, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useToday } from '../../hooks/useToday';
+import { IconDots, IconFeel, IconMic, IconPlus, IconRefresh, IconSpark } from '../icons';
 import { ASL_PLAYBACK_RATE, AslPlayer, type SignedLine } from './AslPlayer';
 import { ASL_CITATION, ASL_LABEL } from './aslLibrary';
 import {
@@ -21,7 +24,14 @@ function prefersReducedMotion() {
 
 export type SignHandoff = NonNullable<GuideReply['handoff']>;
 
-/** Full-screen signed conversation: avatar + bottom tap answers. */
+function answerIcon(id: string) {
+  if (id.includes('help') || id.includes('worse') || id.includes('pain')) return <IconFeel />;
+  if (id.includes('thank') || id.includes('hello') || id.includes("i'm here") || id === 'hello') return <IconSpark />;
+  if (id.includes('ready') || id.includes('yes') || id.includes('better')) return <IconRefresh />;
+  return <IconPlus />;
+}
+
+/** Full-screen signed conversation: animated orb + glass tap answers. */
 export function SignSession({
   lang = 'en',
   onLeave,
@@ -32,6 +42,10 @@ export function SignSession({
   /** Called when a tap asks for SMS / facility / home / end. */
   onHandoff?: (kind: SignHandoff) => void;
 }) {
+  const nav = useNavigate();
+  const today = useToday('sign');
+  const name = today.name ?? 'Mama';
+
   const [step, setStep] = useState(0);
   const [reply, setReply] = useState<GuideReply | null>(null);
   const [line, setLine] = useState<SignedLine | null>(null);
@@ -40,6 +54,8 @@ export function SignSession({
   const [slow, setSlow] = useState(true);
   const [replay, setReplay] = useState(0);
   const [done, setDone] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [started, setStarted] = useState(false);
 
   const order = SIGN_ORDER;
   const clipId = order[Math.min(step, Math.max(order.length - 1, 0))] ?? '';
@@ -48,6 +64,7 @@ export function SignSession({
     [clipId],
   );
   const total = order.length;
+  const signing = started && !done && !problem;
 
   const showLine = useCallback((next: SignedLine | null) => setLine(next), []);
   const showProblem = useCallback((message: string) => setProblem(message), []);
@@ -77,10 +94,16 @@ export function SignSession({
     setPaused(false);
   }
 
+  function begin() {
+    setStarted(true);
+    setPaused(false);
+    setReplay((n) => n + 1);
+  }
+
   if (problem) {
     return (
       <main className="screen sign-session">
-        <div className="panel" style={{ textAlign: 'center', marginTop: '2rem' }}>
+        <div className="sign-session__panel">
           <strong>{lang === 'sw' ? 'Ishara hazipatikani hapa' : 'Signed lines are not available here'}</strong>
           <p className="soft-note" style={{ marginTop: '0.5rem' }}>
             {lang === 'sw'
@@ -96,55 +119,117 @@ export function SignSession({
   }
 
   return (
-    <main className="screen sign-session">
+    <main className="screen sign-session" data-signing={signing}>
       <header className="sign-session__top">
-        <strong>{lang === 'sw' ? 'Mazungumzo ya ishara' : 'Sign conversation'}</strong>
-        <button type="button" className="btn btn-ghost" onClick={onLeave}>
-          {lang === 'sw' ? 'Tumia maandishi' : 'Use text instead'}
+        <button
+          type="button"
+          className="sign-session__orb-btn"
+          aria-label={lang === 'sw' ? 'Rudi' : 'Back'}
+          onClick={onLeave}
+        >
+          ←
         </button>
+        <p className="sign-session__greet">
+          {lang === 'sw' ? `Habari, ${name}!` : `Hello, ${name}!`}{' '}
+          <span>{lang === 'sw' ? 'Naweza kukusaidiaje leo?' : 'How can I help you today?'}</span>
+        </p>
+        <div className="sign-session__menu-wrap">
+          <button
+            type="button"
+            className="sign-session__orb-btn"
+            aria-label={lang === 'sw' ? 'Mipangilio' : 'Settings'}
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((v) => !v)}
+          >
+            <IconDots />
+          </button>
+          {menuOpen ? (
+            <div className="sign-session__menu" role="menu">
+              <button
+                type="button"
+                role="menuitem"
+                aria-pressed={slow}
+                onClick={() => setSlow((v) => !v)}
+              >
+                {lang === 'sw' ? (slow ? 'Kasi ya kawaida' : 'Polepole') : slow ? 'Normal speed' : 'Slower'}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setReplay((n) => n + 1);
+                  setPaused(false);
+                  setMenuOpen(false);
+                }}
+              >
+                {lang === 'sw' ? 'Cheza tena' : 'Play again'}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onLeave();
+                }}
+              >
+                {lang === 'sw' ? 'Tumia maandishi' : 'Use text instead'}
+              </button>
+            </div>
+          ) : null}
+        </div>
       </header>
 
-      <section className="sign-session__stage" aria-label={lang === 'sw' ? 'Mtu anayefanya ishara' : 'Signing figure'}>
-        <span className="sign-session__badge">
-          {lang === 'sw' ? `Mstari ${Math.min(step + 1, total)} / ${total}` : `Line ${Math.min(step + 1, total)} of ${total}`}
-        </span>
-        <AslPlayer
-          clipId={clipId}
-          tall
-          passport
-          showCaption={false}
-          paused={paused}
-          speed={slow ? ASL_PLAYBACK_RATE * 0.65 : ASL_PLAYBACK_RATE}
-          replay={replay}
-          onLine={showLine}
-          onProblem={showProblem}
-        />
-        <p className="sign-session__sentence" aria-live="polite">
-          {line?.sentence ?? (lang === 'sw' ? 'Inapakia mstari…' : 'Loading the line…')}
-        </p>
-        <div className="sign-session__controls">
-          <button
-            type="button"
-            className="btn btn-ghost"
-            aria-pressed={paused}
-            onClick={() => setPaused((v) => !v)}
-          >
-            {paused ? (lang === 'sw' ? 'Cheza' : 'Play') : lang === 'sw' ? 'Simamisha' : 'Pause'}
-          </button>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={() => {
-              setReplay((n) => n + 1);
-              setPaused(false);
-            }}
-          >
-            {lang === 'sw' ? 'Tena' : 'Again'}
-          </button>
-          <button type="button" className="btn btn-ghost" aria-pressed={slow} onClick={() => setSlow((v) => !v)}>
-            {lang === 'sw' ? 'Polepole' : 'Slower'}
-          </button>
+      <section className="sign-session__hero" aria-label={lang === 'sw' ? 'Mtu anayefanya ishara' : 'Signing figure'}>
+        <div className="sign-session__orb" data-paused={paused} data-live={signing}>
+          <div className="sign-session__orb-glow" aria-hidden />
+          <div className="sign-session__orb-core">
+            {started ? (
+              <AslPlayer
+                clipId={clipId}
+                tall
+                passport
+                showCaption={false}
+                paused={paused}
+                speed={slow ? ASL_PLAYBACK_RATE * 0.65 : ASL_PLAYBACK_RATE}
+                replay={replay}
+                onLine={showLine}
+                onProblem={showProblem}
+              />
+            ) : (
+              <img
+                className="sign-session__orb-face"
+                src="/brand/neema-companion.jpg"
+                alt=""
+                width={240}
+                height={240}
+                decoding="async"
+              />
+            )}
+          </div>
+          <span className="sign-session__orb-eyes" aria-hidden>
+            <i />
+            <i />
+          </span>
         </div>
+
+        {started ? (
+          <>
+            <p className="sign-session__line" aria-live="polite">
+              {line?.sentence ?? (lang === 'sw' ? 'Inapakia mstari…' : 'Loading the line…')}
+            </p>
+            <p className="sign-session__progress">
+              {lang === 'sw'
+                ? `Mstari ${Math.min(step + 1, total)} / ${total}`
+                : `Line ${Math.min(step + 1, total)} of ${total}`}
+            </p>
+          </>
+        ) : (
+          <p className="sign-session__hint">
+            {lang === 'sw'
+              ? 'Neema anafanya ishara. Kamera inazimwa.'
+              : 'Neema signs with you. The camera stays off.'}
+          </p>
+        )}
       </section>
 
       {reply ? (
@@ -162,41 +247,111 @@ export function SignSession({
         </section>
       ) : null}
 
-      {!done ? (
-        <section className="sign-session__answers" aria-labelledby="sign-answer-heading">
-          <h2 id="sign-answer-heading" className="section-title">
+      {!started ? (
+        <section className="sign-session__actions" aria-label={lang === 'sw' ? 'Anza' : 'Start'}>
+          <button type="button" className="sign-session__action" onClick={begin}>
+            <span className="sign-session__action-ico" data-tone="a">
+              <IconSpark />
+            </span>
+            {lang === 'sw' ? 'Anza ishara' : 'Start signing'}
+          </button>
+          <button
+            type="button"
+            className="sign-session__action"
+            onClick={() => {
+              setSlow(true);
+              begin();
+            }}
+          >
+            <span className="sign-session__action-ico" data-tone="b">
+              <IconFeel />
+            </span>
+            {lang === 'sw' ? 'Anza polepole' : 'Start slower'}
+          </button>
+          <button type="button" className="sign-session__action" onClick={() => nav('/care')}>
+            <span className="sign-session__action-ico" data-tone="c">
+              <IconPlus />
+            </span>
+            {lang === 'sw' ? 'Ongea na Neema' : 'Talk with Neema'}
+          </button>
+          <button type="button" className="sign-session__action" onClick={onLeave}>
+            <span className="sign-session__action-ico" data-tone="d">
+              <IconMic />
+            </span>
+            {lang === 'sw' ? 'Tumia maandishi' : 'Use text instead'}
+          </button>
+        </section>
+      ) : !done ? (
+        <section className="sign-session__actions" aria-labelledby="sign-answer-heading">
+          <h2 id="sign-answer-heading" className="visually-hidden">
             {lang === 'sw' ? 'Jibu lako' : 'Your answer'}
           </h2>
-          <div className="sign-session__grid">
-            {answers.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className="btn btn-primary sign-session__tap"
-                onClick={() => onAnswer(item.id)}
-              >
-                {lang === 'sw' ? item.labelSw : item.labelEn}
-              </button>
-            ))}
+          {answers.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className="sign-session__action"
+              onClick={() => onAnswer(item.id)}
+            >
+              <span className="sign-session__action-ico" data-tone="a">
+                {answerIcon(item.id)}
+              </span>
+              {lang === 'sw' ? item.labelSw : item.labelEn}
+            </button>
+          ))}
+          <div className="sign-session__playback">
+            <button type="button" className="sign-session__chip" aria-pressed={paused} onClick={() => setPaused((v) => !v)}>
+              {paused ? (lang === 'sw' ? 'Cheza' : 'Play') : lang === 'sw' ? 'Simamisha' : 'Pause'}
+            </button>
+            <button
+              type="button"
+              className="sign-session__chip"
+              onClick={() => {
+                setReplay((n) => n + 1);
+                setPaused(false);
+              }}
+            >
+              {lang === 'sw' ? 'Tena' : 'Again'}
+            </button>
+            <button type="button" className="sign-session__chip" aria-pressed={slow} onClick={() => setSlow((v) => !v)}>
+              {lang === 'sw' ? 'Polepole' : 'Slower'}
+            </button>
           </div>
-          <p className="trust-line">
-            {lang === 'sw'
-              ? 'Majibu ni mguso. Kamera inazimwa. Ukijisikia vibaya, nenda kliniki. Klipu ni utafiti wa ASL — si KSL.'
-              : 'Answers are taps. The camera stays off. If you feel worse, go to a clinic. Clips are research ASL — not KSL.'}
-          </p>
         </section>
       ) : (
-        <div className="btn-row" style={{ marginTop: '1rem', flexDirection: 'column', gap: '0.5rem' }}>
+        <div className="sign-session__done">
           <button type="button" className="btn btn-primary" style={{ width: '100%' }} onClick={onLeave}>
             {lang === 'sw' ? 'Maliza' : 'Done'}
           </button>
         </div>
       )}
 
+      <div className="sign-session__dock">
+        <button type="button" className="sign-session__ask" onClick={() => nav('/care')}>
+          <span className="sign-session__ask-plus" aria-hidden>
+            <IconPlus />
+          </span>
+          <span>{lang === 'sw' ? 'Niulize chochote…' : 'Ask me anything…'}</span>
+        </button>
+        <button
+          type="button"
+          className="sign-session__mic"
+          aria-label={lang === 'sw' ? 'Ongea kwa sauti' : 'Talk with voice'}
+          onClick={() => nav('/care')}
+        >
+          <IconMic />
+        </button>
+      </div>
+
       <details className="sign-session__about">
         <summary>{lang === 'sw' ? 'Kuhusu klipu hizi' : 'About these clips'}</summary>
         <p className="soft-note">{line?.label ?? ASL_LABEL}</p>
         <p className="soft-note">{line?.citation ?? ASL_CITATION}</p>
+        <p className="soft-note">
+          {lang === 'sw'
+            ? 'Majibu ni mguso. Kamera inazimwa. Klipu ni utafiti wa ASL — si KSL.'
+            : 'Answers are taps. The camera stays off. Clips are research ASL — not KSL.'}
+        </p>
       </details>
     </main>
   );
