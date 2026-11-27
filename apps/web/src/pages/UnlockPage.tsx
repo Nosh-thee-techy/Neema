@@ -5,34 +5,62 @@ import { BrandMark } from '../ui/BrandMark';
 import { LangToggle } from '../ui/LangToggle';
 import { useLocale } from '../hooks/useLocale';
 import { getAuthMeta, setPin, unlockWithPin } from '../services/auth';
-import { contactReadiness } from '../services/contacts';
+import { PinInput } from '../ui/PinInput';
 import { LoadingScreen } from '../ui/LoadingScreen';
 
-/** Local PIN — private on this phone. */
+/** Local PIN — private on this phone. Set (with confirm) or unlock. */
 export function UnlockPage() {
   const nav = useNavigate();
   const { t, lang } = useLocale();
-  const [mode, setMode] = useState<'loading' | 'set' | 'unlock'>('loading');
+  const sw = lang === 'sw';
+  const tx = (en: string, swText: string) => (sw ? swText : en);
+  const [mode, setMode] = useState<'loading' | 'set' | 'confirm' | 'unlock'>('loading');
+  const [length, setLength] = useState(4);
   const [pin, setPinValue] = useState('');
+  const [firstPin, setFirstPin] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Bumps to remount the boxes (re-focus) after a reset. */
+  const [round, setRound] = useState(0);
 
   useEffect(() => {
-    void getAuthMeta().then((meta) => setMode(meta?.pinEnabled ? 'unlock' : 'set'));
+    void getAuthMeta().then((meta) => {
+      if (meta?.pinEnabled) {
+        // Older installs did not store the length: show 6 boxes and allow 4+.
+        setLength(meta.pinLength ?? 6);
+        setMode('unlock');
+      } else setMode('set');
+    });
   }, []);
 
-  async function submit() {
-    setBusy(true);
+  function reset(message: string | null) {
+    setPinValue('');
+    setError(message);
+    setRound((r) => r + 1);
+  }
+
+  async function submit(value: string) {
+    if (busy || value.length < 4) return;
     setError(null);
+    if (mode === 'set') {
+      setFirstPin(value);
+      setMode('confirm');
+      reset(null);
+      return;
+    }
+    if (mode === 'confirm' && value !== firstPin) {
+      setMode('set');
+      setFirstPin('');
+      reset(tx('The two PINs did not match. Choose your PIN again.', 'PIN mbili hazilingani. Chagua PIN tena.'));
+      return;
+    }
+    setBusy(true);
     try {
-      if (mode === 'set') await setPin(pin);
-      else await unlockWithPin(pin);
-      // First-time setup: ask who to alert before anything else.
-      // Then pick sign vs text language (talk mode).
-      const { hasRealChp } = await contactReadiness();
-      nav(mode === 'set' && !hasRealChp ? '/contacts?setup=1' : '/talk');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (mode === 'confirm') await setPin(value);
+      else await unlockWithPin(value);
+      nav('/home', { replace: true });
+    } catch {
+      reset(mode === 'unlock' ? tx('That PIN is not right. Try again.', 'PIN si sahihi. Jaribu tena.') : tx('Could not save the PIN. Try again.', 'Imeshindwa kuhifadhi PIN. Jaribu tena.'));
     } finally {
       setBusy(false);
     }
@@ -40,9 +68,17 @@ export function UnlockPage() {
 
   if (mode === 'loading') return <LoadingScreen />;
 
-  const sw = lang === 'sw';
-  const slots = Math.min(6, Math.max(4, pin.length));
-  const ready = pin.length >= 4 && !busy;
+  const legacyUnlock = mode === 'unlock' && length === 6;
+  const ready = pin.length >= (legacyUnlock ? 4 : length) && !busy;
+
+  const title =
+    mode === 'set' ? tx('Set your PIN', 'Weka PIN yako') : mode === 'confirm' ? tx('Enter it again', 'Iandike tena') : tx('Welcome back', 'Karibu tena');
+  const sub =
+    mode === 'set'
+      ? tx(`Choose ${length} numbers you will remember. Your PIN keeps your information private on this phone.`, `Chagua namba ${length} utakazokumbuka. PIN inalinda taarifa zako kwenye simu hii.`)
+      : mode === 'confirm'
+        ? tx('Type the same PIN once more to be sure.', 'Andika PIN ileile tena kuhakikisha.')
+        : tx('Enter your PIN to open Neema.', 'Ingiza PIN yako kufungua Neema.');
 
   return (
     <main className="screen auth-screen">
@@ -61,73 +97,77 @@ export function UnlockPage() {
         </span>
 
         <h1 id="auth-title" className="auth-card__title">
-          {mode === 'set' ? (sw ? 'Weka PIN yako' : 'Set your PIN') : sw ? 'Karibu tena' : 'Welcome back'}
+          {title}
         </h1>
-        <p className="auth-card__sub">
-          {mode === 'set'
-            ? sw
-              ? 'Chagua namba 4 hadi 6. PIN inalinda taarifa zako kwenye simu hii.'
-              : 'Choose 4 to 6 digits. Your PIN keeps your story private on this phone.'
-            : sw
-              ? 'Ingiza PIN yako kufungua Neema.'
-              : 'Enter your PIN to open Neema.'}
-        </p>
+        <p className="auth-card__sub">{sub}</p>
 
         <form
           className="auth-card__form"
           onSubmit={(e) => {
             e.preventDefault();
-            if (ready) void submit();
+            if (ready) void submit(pin);
           }}
         >
-          <label htmlFor="pin" className="sr-only">
-            PIN
-          </label>
-          <div className="pin-boxes" data-error={Boolean(error)}>
-            <input
-              id="pin"
-              className="pin-boxes__input"
-              inputMode="numeric"
-              type="password"
-              autoComplete={mode === 'set' ? 'new-password' : 'current-password'}
-              maxLength={6}
-              autoFocus
-              value={pin}
-              aria-invalid={Boolean(error)}
-              aria-describedby={error ? 'pin-error' : undefined}
-              onChange={(e) => {
-                setError(null);
-                setPinValue(e.target.value.replace(/\D/g, '').slice(0, 6));
-              }}
-            />
-            {Array.from({ length: slots }, (_, i) => (
-              <span key={i} className="pin-boxes__slot" data-filled={i < pin.length} data-active={i === pin.length} aria-hidden />
-            ))}
-          </div>
+          <PinInput
+            key={`${mode}-${length}-${round}`}
+            length={length}
+            value={pin}
+            onChange={(v) => {
+              setError(null);
+              setPinValue(v);
+            }}
+            onComplete={(v) => {
+              if (!legacyUnlock) void submit(v);
+            }}
+            autoFocus
+            invalid={Boolean(error)}
+            describedBy={error ? 'pin-error' : undefined}
+            label={title}
+            digitLabel={(i, n) => tx(`Digit ${i} of ${n}`, `Namba ${i} kati ya ${n}`)}
+            disabled={busy}
+          />
 
           {error ? (
             <p id="pin-error" className="auth-card__error" role="alert">
-              {mode === 'unlock'
-                ? sw
-                  ? 'PIN si sahihi. Jaribu tena.'
-                  : 'That PIN is not right. Try again.'
-                : error}
+              {error}
             </p>
           ) : null}
 
           <Button type="submit" variant="primary" className="auth-card__submit" disabled={!ready}>
             {busy
-              ? sw
-                ? 'Subiri…'
-                : 'Please wait…'
+              ? tx('Please wait…', 'Subiri…')
               : mode === 'set'
-                ? sw
-                  ? 'Hifadhi PIN'
-                  : 'Save PIN'
-                : sw
-                  ? 'Fungua'
-                  : 'Unlock'}
+                ? tx('Next', 'Endelea')
+                : mode === 'confirm'
+                  ? tx('Save PIN', 'Hifadhi PIN')
+                  : tx('Unlock', 'Fungua')}
           </Button>
+
+          {mode === 'set' ? (
+            <button
+              type="button"
+              className="auth-card__switch"
+              onClick={() => {
+                setLength((n) => (n === 4 ? 6 : 4));
+                reset(null);
+              }}
+            >
+              {length === 4 ? tx('Use 6 numbers instead', 'Tumia namba 6 badala yake') : tx('Use 4 numbers instead', 'Tumia namba 4 badala yake')}
+            </button>
+          ) : null}
+          {mode === 'confirm' ? (
+            <button
+              type="button"
+              className="auth-card__switch"
+              onClick={() => {
+                setMode('set');
+                setFirstPin('');
+                reset(null);
+              }}
+            >
+              {tx('Start again', 'Anza upya')}
+            </button>
+          ) : null}
         </form>
 
         <p className="auth-card__trust">
@@ -139,7 +179,7 @@ export function UnlockPage() {
         </p>
       </section>
       <p className="auth-foot">
-        {sw ? 'Hakuna akaunti wala mtandao. PIN haitoki kwenye simu hii.' : 'No account, no internet. Your PIN never leaves this phone.'}
+        {tx('No online account. Your PIN never leaves this phone.', 'Hakuna akaunti ya mtandaoni. PIN haitoki kwenye simu hii.')}
       </p>
     </main>
   );

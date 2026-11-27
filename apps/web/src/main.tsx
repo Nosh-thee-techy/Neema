@@ -12,6 +12,7 @@ import './styles/bento.css';
 import './styles/care-chat.css';
 import './styles/todo.css';
 import './styles/auth.css';
+import './styles/register.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

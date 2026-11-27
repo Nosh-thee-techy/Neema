@@ -3,6 +3,8 @@ import {
   eddFromGestationalAge,
   isValidGestationalAge,
   pregnancyProgress,
+  parseLocalIsoDate,
+  toLocalIsoDate,
   trimesterFor,
 } from '../src/pregnancy.js';
 
@@ -49,5 +51,13 @@ describe('pregnancy dating', () => {
     expect(isValidGestationalAge(24, 3)).toBe(true);
     expect(isValidGestationalAge(24, 7)).toBe(false);
     expect(isValidGestationalAge(50, 0)).toBe(false);
+  });
+
+  it('local ISO date helpers round-trip without a UTC shift', () => {
+    const ms = parseLocalIsoDate('2027-03-16')!;
+    expect(new Date(ms).getDate()).toBe(16);
+    expect(toLocalIsoDate(ms)).toBe('2027-03-16');
+    expect(parseLocalIsoDate('2027-02-30')).toBeNull();
+    expect(parseLocalIsoDate('16/03/2027')).toBeNull();
   });
 });

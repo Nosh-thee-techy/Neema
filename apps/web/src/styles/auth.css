@@ -214,3 +214,63 @@
     animation: none;
   }
 }
+
+/* Separate PIN boxes (one real input each). */
+.pin-input {
+  display: flex;
+  justify-content: center;
+  gap: 0.55rem;
+}
+
+.pin-input__box {
+  width: 52px;
+  height: 62px;
+  border-radius: 16px;
+  border: 1.5px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  caret-color: var(--primary);
+  font: inherit;
+  font-size: 1.6rem; /* also stops iOS zoom */
+  font-weight: 700;
+  text-align: center;
+  padding: 0;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.pin-input__box[data-filled='true'] {
+  background: var(--surface, #fff);
+  border-color: rgba(29, 39, 64, 0.35);
+}
+
+.pin-input__box:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(29, 39, 64, 0.12);
+}
+
+.pin-input[data-error='true'] .pin-input__box {
+  border-color: rgba(193, 58, 82, 0.7);
+  animation: pin-shake 320ms ease;
+}
+
+@media (max-width: 360px) {
+  .pin-input {
+    gap: 0.4rem;
+  }
+  .pin-input__box {
+    width: 44px;
+    height: 56px;
+  }
+}
+
+.auth-card__switch {
+  border: 0;
+  background: none;
+  color: var(--accent, var(--primary));
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.88rem;
+  min-height: 44px;
+  cursor: pointer;
+}

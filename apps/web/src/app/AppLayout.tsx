@@ -2,7 +2,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { BottomNav } from '../ui/BottomNav';
 import { NeemaFab } from '../ui/NeemaFab';
 
-const HIDE_NAV = new Set(['/start', '/orient', '/consent', '/unlock', '/alert']);
+const HIDE_NAV = new Set(['/start', '/orient', '/consent', '/register', '/unlock', '/alert']);
 /** Full-screen Neema surfaces — hide the floating icon while already there. */
 const HIDE_NEEMA_FAB = new Set(['/care', '/sign', '/talk', ...HIDE_NAV]);
 

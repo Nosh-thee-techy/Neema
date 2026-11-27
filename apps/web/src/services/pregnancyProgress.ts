@@ -1,4 +1,4 @@
-import { pregnancyProgress, type PregnancyDating, type PregnancyProgress } from '@neema/core';
+import { parseLocalIsoDate, pregnancyProgress, type PregnancyDating, type PregnancyProgress } from '@neema/core';
 import type { MamaProfile } from './passport';
 
 /**
@@ -12,7 +12,7 @@ export function datingFromProfile(p: MamaProfile | null | undefined): PregnancyD
     return { kind: 'ga', weeks: p.gaWeeks, days: p.gaDays ?? 0, recordedOnMs: p.gaRecordedOnMs };
   }
   if (p.expectedDeliveryDate) {
-    const ms = Date.parse(p.expectedDeliveryDate);
+    const ms = (parseLocalIsoDate(p.expectedDeliveryDate) ?? Date.parse(p.expectedDeliveryDate));
     if (Number.isFinite(ms)) return { kind: 'edd', eddMs: ms };
   }
   return null;

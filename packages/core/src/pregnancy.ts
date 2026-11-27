@@ -83,3 +83,19 @@ export function pregnancyProgress(dating: PregnancyDating, nowMs: number = Date.
     daysToEdd,
   };
 }
+
+/** "YYYY-MM-DD" for the local calendar day of `ms` (no UTC shift). */
+export function toLocalIsoDate(ms: number): string {
+  const d = new Date(ms);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/** Parses "YYYY-MM-DD" as local midnight (Date.parse would use UTC). Null if invalid. */
+export function parseLocalIsoDate(iso: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso.trim());
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  if (d.getMonth() !== Number(m[2]) - 1 || d.getDate() !== Number(m[3])) return null;
+  return d.getTime();
+}

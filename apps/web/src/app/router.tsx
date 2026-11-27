@@ -4,7 +4,7 @@ import { AppLayout } from './AppLayout';
 import { RequireAuth } from './RequireAuth';
 import { EntryPage } from '../pages/EntryPage';
 import { OrientationPage } from '../pages/OrientationPage';
-import { ConsentPage } from '../pages/ConsentPage';
+import { RegisterPage } from '../pages/RegisterPage';
 import { UnlockPage } from '../pages/UnlockPage';
 import { HomePage } from '../pages/HomePage';
 import { VitalsPage } from '../pages/VitalsPage';
@@ -40,7 +40,8 @@ export function AppRouter() {
           <Route element={<AppLayout />}>
             <Route path="/start" element={<EntryPage />} />
             <Route path="/orient" element={<OrientationPage />} />
-            <Route path="/consent" element={<ConsentPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/consent" element={<Navigate to="/register" replace />} />
             <Route path="/unlock" element={<UnlockPage />} />
             <Route
               path="/talk"

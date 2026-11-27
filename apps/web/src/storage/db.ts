@@ -73,6 +73,7 @@ export interface AuthRow {
   pinEnabled: boolean;
   saltB64?: string;
   pinVerifier?: string;
+  pinLength?: number;
   updatedAtMs: number;
 }
 

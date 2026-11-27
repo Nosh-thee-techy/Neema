@@ -48,7 +48,7 @@ export function OrientationPage() {
   function finish() {
     const flags = loadOnboarding();
     saveOnboarding({ ...flags, orientationDone: true });
-    nav('/consent');
+    nav('/register');
   }
 
   return (

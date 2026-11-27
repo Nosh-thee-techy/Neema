@@ -3,6 +3,13 @@ const KEY = 'neema.onboarding.v1';
 export interface OnboardingFlags {
   orientationDone: boolean;
   consentDone: boolean;
+  /** Registration wizard finished (v2). Older installs only have consentDone. */
+  registrationDone?: boolean;
+}
+
+/** Registered = wizard done, or an older install that already gave consent. */
+export function isRegistered(flags: OnboardingFlags): boolean {
+  return Boolean(flags.registrationDone || flags.consentDone);
 }
 
 export function loadOnboarding(): OnboardingFlags {

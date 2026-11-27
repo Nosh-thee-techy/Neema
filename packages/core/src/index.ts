@@ -177,6 +177,8 @@ export {
   eddFromGestationalAge,
   isValidGestationalAge,
   pregnancyProgress,
+  toLocalIsoDate,
+  parseLocalIsoDate,
   trimesterFor,
   type PregnancyDating,
   type PregnancyProgress,

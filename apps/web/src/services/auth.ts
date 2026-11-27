@@ -17,6 +17,8 @@ export interface AuthMeta {
   saltB64?: string;
   /** Encrypted verifier so we can check PIN without storing it. */
   pinVerifier?: string;
+  /** How many digits the PIN has, so the unlock screen shows the right number of boxes. */
+  pinLength?: number;
   updatedAtMs: number;
 }
 
@@ -58,6 +60,7 @@ export async function setPin(pin: string, nowMs: number = Date.now()): Promise<v
     pinEnabled: true,
     saltB64: material.saltB64,
     pinVerifier,
+    pinLength: pin.length,
     updatedAtMs: nowMs,
   };
   await db.auth.put(row);
