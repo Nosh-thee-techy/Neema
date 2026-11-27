@@ -37,6 +37,7 @@ import {
 } from '../services/passport';
 import { listContacts, saveContact } from '../services/contacts';
 import { addClinicalNote } from '../services/clinicalNotes';
+import { db } from '../storage/db';
 
 /**
  * Multi-step registration for the mother herself, a CHW, or a nurse.
@@ -65,6 +66,8 @@ interface Draft {
   gaDays: string;
   dueDate: string;
   firstPregnancy: '' | 'yes' | 'no';
+  deliveryDate: string;
+  deliveryMode: '' | 'vaginal' | 'assisted' | 'caesarean';
   previousPregnancies: string;
   pastComplications: string[];
   conditions: string[];
@@ -101,6 +104,8 @@ const EMPTY: Draft = {
   gaDays: '0',
   dueDate: '',
   firstPregnancy: '',
+  deliveryDate: '',
+  deliveryMode: '',
   previousPregnancies: '',
   pastComplications: [],
   conditions: [],
@@ -146,6 +151,8 @@ const FIELD_STEP: Record<RegistrationField, StepId> = {
   dueDate: 'pregnancy',
   firstPregnancy: 'pregnancy',
   previousPregnancies: 'pregnancy',
+  deliveryDate: 'pregnancy',
+  deliveryMode: 'pregnancy',
   allergies: 'health',
   chpName: 'contacts',
   chpPhone: 'contacts',
@@ -245,6 +252,8 @@ export function RegisterPage() {
           ? { mode: 'weeks', weeks: d.gaWeeks === '' ? null : Number(d.gaWeeks), days: Number(d.gaDays || 0) }
           : { mode: 'due', dueDateMs: d.dueDate ? parseLocalIsoDate(d.dueDate) : null },
       firstPregnancy: d.firstPregnancy === '' ? null : d.firstPregnancy === 'yes',
+      deliveryDateMs: d.deliveryDate ? parseLocalIsoDate(d.deliveryDate) : null,
+      deliveryMode: d.deliveryMode || null,
       previousPregnancies: d.previousPregnancies === '' ? null : Number(d.previousPregnancies),
       allergies: d.allergies,
       chpName: d.chpName,
@@ -296,6 +305,14 @@ export function RegisterPage() {
         return code === 'required'
           ? tx('Enter the due date from the clinic card.', 'Andika tarehe ya kujifungua kutoka kadi ya kliniki.')
           : tx('That due date does not fit a current pregnancy. Check the clinic card.', 'Tarehe hiyo haiendani na mimba ya sasa. Angalia kadi ya kliniki.');
+      case 'deliveryDate':
+        return code === 'future_date'
+          ? tx('The birth date cannot be in the future.', 'Tarehe ya kuzaliwa haiwezi kuwa ya baadaye.')
+          : code === 'required'
+            ? tx('Enter the date the baby was born.', 'Andika tarehe mtoto alizaliwa.')
+            : tx('Check the date: it should be within the last year.', 'Angalia tarehe: iwe ndani ya mwaka mmoja uliopita.');
+      case 'deliveryMode':
+        return tx('Choose how the baby was born.', 'Chagua jinsi mtoto alivyozaliwa.');
       case 'firstPregnancy':
         return tx('Choose Yes or No.', 'Chagua Ndiyo au Hapana.');
       case 'previousPregnancies':
@@ -426,6 +443,19 @@ export function RegisterPage() {
           profile.expectedDeliveryDate = d.dueDate;
           if (progress) profile.gestationWeeks = progress.weeks;
         }
+      }
+
+      if (d.stage === 'postpartum' && d.deliveryDate && d.deliveryMode) {
+        profile.delivery = {
+          dateIso: d.deliveryDate,
+          mode: d.deliveryMode,
+          complications: [],
+          babiesCount: 1,
+          showBabyInfo: true,
+          recordedBy: { role: d.role, ...(d.registrarName.trim() ? { name: d.registrarName.trim() } : {}) },
+          recordedAtMs: now,
+        };
+        await db.babies.put({ id: `baby_${d.deliveryDate}_1`, birthDateIso: d.deliveryDate, createdAtMs: now });
       }
 
       await saveProfile(profile);
@@ -625,6 +655,34 @@ export function RegisterPage() {
                 ]}
               />
             </div>
+
+            {d.stage === 'postpartum' && (
+              <>
+                <FormField id="reg-birth-date" label={tx('Date the baby was born', 'Tarehe mtoto alizaliwa')} required error={msg('deliveryDate')}>
+                  <input id="reg-birth-date" type="date" max={toLocalIsoDate(nowMs)} value={d.deliveryDate} onChange={(e) => set('deliveryDate', e.target.value)} {...invalidProps('reg-birth-date', msg('deliveryDate'))} />
+                </FormField>
+                <div className="field">
+                  <span className="n-label">
+                    {tx('How was the baby born?', 'Mtoto alizaliwa vipi?')}
+                    <RequiredMark />
+                  </span>
+                  <Segmented
+                    ariaLabel={tx('How the baby was born', 'Jinsi mtoto alivyozaliwa')}
+                    value={d.deliveryMode}
+                    onChange={(v) => set('deliveryMode', v)}
+                    invalid={Boolean(msg('deliveryMode'))}
+                    describedBy={msg('deliveryMode') ? 'reg-mode-error' : undefined}
+                    options={[
+                      { value: 'vaginal', label: tx('Normal birth', 'Kawaida') },
+                      { value: 'assisted', label: tx('Assisted', 'Kwa kusaidiwa') },
+                      { value: 'caesarean', label: tx('Caesarean', 'Upasuaji') },
+                    ]}
+                  />
+                  {msg('deliveryMode') ? <FieldError id="reg-mode-error" message={msg('deliveryMode')!} /> : null}
+                </div>
+                {why('Neema uses the birth date to show the right recovery advice each day.', 'Neema hutumia tarehe ya kuzaliwa kuonyesha ushauri sahihi wa kupona kila siku.')}
+              </>
+            )}
 
             {d.stage === 'pregnancy' && (
               <>
@@ -875,7 +933,10 @@ export function RegisterPage() {
             </ReviewBlock>
             <ReviewBlock title={stepLabels.pregnancy} onEdit={() => goTo('pregnancy')} editLabel={tx('Edit', 'Badilisha')}>
               {d.stage === 'postpartum' ? (
-                <Row k={tx('Stage', 'Hatua')} v={tx('Gave birth recently', 'Amejifungua karibuni')} />
+                <>
+                  <Row k={tx('Stage', 'Hatua')} v={tx('Gave birth recently', 'Amejifungua karibuni')} />
+                  <Row k={tx('Baby born', 'Mtoto alizaliwa')} v={d.deliveryDate ? fmtDate(parseLocalIsoDate(d.deliveryDate) ?? 0) : ''} />
+                </>
               ) : (
                 <>
                   <Row k={tx('Today', 'Leo')} v={progress ? tx(`${progress.weeks} w ${progress.days} d · trimester ${progress.trimester}`, `wiki ${progress.weeks} siku ${progress.days} · kipindi ${progress.trimester}`) : ''} />

@@ -6,6 +6,9 @@ import { EntryPage } from '../pages/EntryPage';
 import { OrientationPage } from '../pages/OrientationPage';
 import { RegisterPage } from '../pages/RegisterPage';
 import { TermsPage } from '../pages/TermsPage';
+import { RecordBirthPage } from '../pages/RecordBirthPage';
+import { RecoveryCheckPage } from '../pages/RecoveryCheckPage';
+import { WellbeingPage } from '../pages/WellbeingPage';
 import { UnlockPage } from '../pages/UnlockPage';
 import { HomePage } from '../pages/HomePage';
 import { VitalsPage } from '../pages/VitalsPage';
@@ -181,6 +184,30 @@ export function AppRouter() {
               element={
                 <RequireAuth>
                   <TeamPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/record-birth"
+              element={
+                <RequireAuth>
+                  <RecordBirthPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/recovery-check"
+              element={
+                <RequireAuth>
+                  <RecoveryCheckPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/wellbeing"
+              element={
+                <RequireAuth>
+                  <WellbeingPage />
                 </RequireAuth>
               }
             />

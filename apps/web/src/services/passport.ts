@@ -56,11 +56,38 @@ export interface MamaProfile {
   phoneKind?: 'smartphone' | 'basic' | 'none';
   /** She agreed to automated voice calls / SMS on phoneForAlerts. Calls need a server (see BACKEND_CONTRACT.md). */
   automatedCallsConsent?: boolean;
+  /**
+   * The birth, once recorded. Pregnancy fields (gaWeeks, expectedDeliveryDate, …) are
+   * kept untouched so the pregnancy history stays available.
+   */
+  delivery?: DeliveryRecord;
   /** When the registration wizard finished. */
   registeredAtMs?: number;
 }
 
 export type RegistrarRole = 'self' | 'chw' | 'nurse';
+
+export type DeliveryMode = 'vaginal' | 'assisted' | 'caesarean';
+export type DeliveryComplication = 'heavy_bleeding' | 'high_bp' | 'transfusion' | 'infection' | 'long_labour';
+
+export interface DeliveryRecord {
+  /** Local calendar date of birth, YYYY-MM-DD. */
+  dateIso: string;
+  /** Optional HH:MM. */
+  time?: string;
+  mode: DeliveryMode;
+  place?: 'facility' | 'home' | 'on_the_way';
+  facilityName?: string;
+  complications: DeliveryComplication[];
+  otherComplication?: string;
+  babiesCount: number;
+  /** "Your Baby's First Weeks" on the dashboard; the mother can turn it off. */
+  showBabyInfo: boolean;
+  /** Pregnancy length at birth, from the saved dating (for history). */
+  gestationAtBirth?: { weeks: number; days: number };
+  recordedBy: RegisteredBy;
+  recordedAtMs: number;
+}
 
 export interface RegisteredBy {
   role: RegistrarRole;

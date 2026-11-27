@@ -11,6 +11,8 @@
   "unknown_check_band": "Angalia bendi yako. Hakuna data sahihi kwa sasa.",
   "epds_ok": "Asante mama. Majibu yako yamehifadhiwa kwa faragha kwenye simu hii.",
   "epds_talk_to_person": "Tafadhali zungumza na mhudumu wa afya au mtu unayemwamini. Hii si utambuzi — ni msaada.",
+  "red_talk_now": "Tafadhali zungumza na mtu sasa hivi. Mpigie CHP wako au mtu unayemwamini, au piga 1199 bure. Hauko peke yako.",
+  "yellow_review_today": "Dalili hii inahitaji kuonwa na mhudumu wa afya leo. Wasiliana na CHP wako au nenda kliniki leo.",
   "_meta": {
     "status": "draft",
     "needs": "Native Swahili speaker and CHP review before real use. TODO(clinician): first-aid wording."

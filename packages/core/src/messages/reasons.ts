@@ -25,6 +25,8 @@ const REASONS: [code: string, phrase: ReasonPhrase][] = [
     'bp_raised_with_symptom',
     { sw: 'shinikizo la damu juu na dalili za hatari', en: 'high blood pressure with danger signs' },
   ],
+  ['emergency_sign', { sw: 'ana dalili ya hatari ya dharura', en: 'an emergency danger sign' }],
+  ['thoughts_of_harm', { sw: 'anahitaji kuzungumza na mtu sasa', en: 'needs someone to talk to now' }],
   ['heavy_bleeding', { sw: 'anatoka damu nyingi', en: 'heavy bleeding' }],
   [
     'fever_fast_pulse',
@@ -41,6 +43,7 @@ const REASONS: [code: string, phrase: ReasonPhrase][] = [
     { sw: 'mapigo ya moyo juu ya kawaida yake', en: 'pulse above her normal' },
   ],
   ['baby_moving_less', { sw: 'mtoto anacheza kidogo', en: 'baby moving less' }],
+  ['review_sign_today', { sw: 'dalili inayohitaji kuonwa leo', en: 'a sign that needs review today' }],
 ];
 
 const BY_CODE = new Map(REASONS);

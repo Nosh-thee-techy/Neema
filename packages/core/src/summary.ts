@@ -52,6 +52,9 @@ export interface NurseSummaryInput {
   /** ISO date string YYYY-MM-DD when known. */
   expectedDeliveryDate?: string;
   gestationWeeks?: number;
+  /** After birth: local date (YYYY-MM-DD) and how the baby was born. */
+  deliveryDate?: string;
+  deliveryMode?: string;
   bp: BpReading[];
   symptoms: SymptomReport[];
   alerts: AlertRecord[];
@@ -68,6 +71,8 @@ export interface NurseSummary {
   stage: Stage;
   expectedDeliveryDate?: string;
   gestationWeeks?: number;
+  deliveryDate?: string;
+  deliveryMode?: string;
   latestLevel: TriageLevel;
   bpTrend: Array<{ tsMs: number; systolic: number; diastolic: number }>;
   recentAlerts: Array<{ tsMs: number; level: string; rules: string[] }>;
@@ -76,6 +81,13 @@ export interface NurseSummary {
   /** Compact JSON string suitable for QR encoding. */
   qrPayload: string;
 }
+
+const POSTPARTUM_QUESTIONS = [
+  'Any heavy bleeding, bad-smelling discharge or fever?',
+  'Any severe headache, blurred vision, chest pain or breathlessness?',
+  'How is her mood and sleep? Any thoughts of harm? (consider EPDS)',
+  'Wound or stitches healing? Breastfeeding going well?',
+];
 
 const DEFAULT_QUESTIONS = [
   'Any severe headache, blurred vision, or upper abdominal pain?',
@@ -120,15 +132,19 @@ export function buildNurseSummary(input: NurseSummaryInput): NurseSummary {
     bpTrend,
     recentAlerts,
     recentSymptoms,
-    questionsToAsk: DEFAULT_QUESTIONS,
+    questionsToAsk: input.stage === 'postpartum' ? POSTPARTUM_QUESTIONS : DEFAULT_QUESTIONS,
     qrPayload: '',
   };
 
   if (input.share.includeDueDate && input.expectedDeliveryDate) {
     summary.expectedDeliveryDate = input.expectedDeliveryDate;
   }
-  if (input.share.includeDueDate && input.gestationWeeks !== undefined) {
+  if (input.share.includeDueDate && input.gestationWeeks !== undefined && input.stage === 'pregnancy') {
     summary.gestationWeeks = input.gestationWeeks;
+  }
+  if (input.stage === 'postpartum' && input.deliveryDate) {
+    summary.deliveryDate = input.deliveryDate;
+    if (input.deliveryMode) summary.deliveryMode = input.deliveryMode;
   }
 
   summary.qrPayload = JSON.stringify({
@@ -137,6 +153,7 @@ export function buildNurseSummary(input: NurseSummaryInput): NurseSummary {
     stage: summary.stage,
     level: summary.latestLevel,
     edd: summary.expectedDeliveryDate ?? null,
+    born: summary.deliveryDate ?? null,
     bp: bpTrend,
     alerts: recentAlerts,
     symptoms: recentSymptoms,

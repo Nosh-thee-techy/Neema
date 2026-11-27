@@ -2,7 +2,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { BottomNav } from '../ui/BottomNav';
 
 /** Screens that are a step in a flow (or an emergency) show no tab bar. */
-const HIDE_NAV = new Set(['/start', '/orient', '/consent', '/register', '/terms', '/unlock', '/alert']);
+const HIDE_NAV = new Set(['/start', '/orient', '/consent', '/register', '/terms', '/record-birth', '/recovery-check', '/unlock', '/alert']);
 
 /** Shell with optional navigation (bottom bar on phones, side rail on laptops). */
 export function AppLayout() {

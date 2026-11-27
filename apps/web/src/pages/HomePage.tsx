@@ -13,11 +13,13 @@ import { openEmergencyDialer } from '../services/emergency';
 import { LoadingScreen } from '../ui/LoadingScreen';
 import { EmergencyHoldButton } from '../ui/EmergencyHoldButton';
 import { BabyStageArt } from '../ui/BabyStageArt';
-import { IconBell, IconChat, IconChevron, IconHeart, IconPressure, IconTemp } from '../ui/icons';
+import { BabyFirstWeeksCard, RecordBirthPrompt, RecoveryCheckinCard, RecoveryExpectCard, RecoveryWelcome, SLEEP_TEXT } from '../ui/RecoveryParts';
+import { IconBell, IconChat, IconChevron, IconHeart, IconMoon, IconPressure, IconTemp } from '../ui/icons';
 
 /** Thresholds come from the (placeholder, unsigned) triage config, never from this file. */
 const CONFIG = getDefaultTriageConfig();
 const DAY_MS = 86_400_000;
+const SLEEP_HOURS = { '0_2': 1, '3_4': 3.5, '5_6': 5.5, '7_plus': 7.5 } as const;
 
 type Tone = 'calm' | 'watch' | 'alert' | 'muted';
 
@@ -90,6 +92,13 @@ export function HomePage() {
     const id = window.setInterval(() => setNowMs(Date.now()), 60_000);
     return () => window.clearInterval(id);
   }, []);
+
+  // Keep the guardian (rules + navigation) on the same stage as the saved profile,
+  // e.g. right after registering after birth or recording the birth.
+  useEffect(() => {
+    if (today.stage && today.stage !== g.stage && !g.demoStep) void g.refreshTriage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [today.stage, g.stage]);
 
   useEffect(() => {
     void listChase().then((open) => {
@@ -196,6 +205,9 @@ export function HomePage() {
   const dateLine = new Date(nowMs).toLocaleDateString(sw ? 'sw-KE' : 'en-KE', { weekday: 'long', day: 'numeric', month: 'long' });
 
   const anc = preg ? nextAncContact(preg.weeks) : null;
+  const postpartum = today.stage === 'postpartum';
+  const showBaby = Boolean(today.delivery?.showBabyInfo);
+  const lastCheck = today.recoveryCheckins.find((c) => c.sleep);
   const babyLabel = preg
     ? tx(`Illustration of a baby at about ${preg.weeks} weeks (not to scale)`, `Mchoro wa mtoto wa karibu wiki ${preg.weeks} (si kwa kipimo halisi)`)
     : '';
@@ -282,6 +294,16 @@ export function HomePage() {
         </button>
       ) : null}
 
+      {postpartum ? (
+        <>
+          {today.recovery ? (
+            <RecoveryWelcome recovery={today.recovery} babies={today.babies} showBaby={showBaby} lang={lang} />
+          ) : null}
+          <RecoveryCheckinCard lang={lang} last={today.recoveryCheckins[0]} doneToday={today.recoveryCheckinToday} />
+          {today.recovery ? <RecoveryExpectCard lang={lang} days={today.recovery.daysSinceBirth} mode={today.delivery?.mode} /> : <RecordBirthPrompt lang={lang} />}
+        </>
+      ) : (
+        <>
       {/* SECOND: daily check-in */}
       <section className="checkin2" aria-labelledby="checkin-title">
         <span className="checkin2__icon" aria-hidden>
@@ -390,6 +412,12 @@ export function HomePage() {
                     {insight.status !== 'reviewed' ? <span className="insight__draft">{tx('Draft: awaiting nurse review', 'Rasimu: inasubiri muuguzi')}</span> : null}
                   </p>
                 </div>
+                <div className={preg.weeks >= 36 ? 'preg2__arrived preg2__arrived--strong' : 'preg2__arrived'}>
+                  <span>{tx('Has your baby arrived?', 'Mtoto wako amefika?')}</span>
+                  <button type="button" className={preg.weeks >= 36 ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'} onClick={() => nav('/record-birth')}>
+                    {tx('Record the birth', 'Andika kujifungua')}
+                  </button>
+                </div>
               </div>
             ) : null}
           </>
@@ -412,6 +440,9 @@ export function HomePage() {
           </>
         )}
       </section>
+
+        </>
+      )}
 
       {/* FOURTH: readings */}
       <section className="home-card reads" aria-labelledby="reads-title" data-attention={anyAttention}>
@@ -442,7 +473,7 @@ export function HomePage() {
         />
         <ReadRow
           icon={<IconTemp />}
-          label={tx('Body temperature', 'Joto la mwili')}
+          label={tx('Skin temperature (band)', 'Joto la ngozi (bendi)')}
           value={temp === null ? '—' : temp.toFixed(1)}
           unit={temp === null ? '' : '°C'}
           time={sampleTs ? when(sampleTs, lang, nowMs) : ''}
@@ -450,6 +481,32 @@ export function HomePage() {
           tone={tempTone}
           spark={<Spark values={trend.minutes.map((m) => m.tempMeanC)} tone={tempTone} />}
         />
+        {postpartum ? (
+          <ReadRow
+            icon={<IconMoon />}
+            label={tx('Sleep last night', 'Usingizi usiku uliopita')}
+            value={lastCheck?.sleep ? SLEEP_TEXT[lastCheck.sleep][sw ? 1 : 0] : '—'}
+            unit=""
+            time={lastCheck ? when(lastCheck.tsMs, lang, nowMs) : ''}
+            flag={
+              lastCheck
+                ? lastCheck.sleep === '0_2' || lastCheck.sleep === '3_4'
+                  ? tx('You reported very little sleep', 'Uliripoti usingizi kidogo sana')
+                  : tx('You reported this in your check-in', 'Uliripoti hii kwenye ukaguzi')
+                : tx('Answer the daily check-in to track sleep', 'Jibu ukaguzi wa kila siku kufuatilia usingizi')
+            }
+            tone={lastCheck && (lastCheck.sleep === '0_2' || lastCheck.sleep === '3_4') ? 'watch' : lastCheck ? 'calm' : 'muted'}
+            spark={<Spark values={today.recoveryCheckins.slice().reverse().flatMap((c) => (c.sleep ? [SLEEP_HOURS[c.sleep]] : []))} tone="calm" />}
+          />
+        ) : null}
+        {postpartum && anyAttention ? (
+          <div className="reads__ask">
+            <p>{tx('A reading needs attention. Answer a few questions so Neema can tell you what to do next.', 'Kipimo kinahitaji uangalifu. Jibu maswali machache ili Neema akuambie hatua inayofuata.')}</p>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => nav('/recovery-check')}>
+              {tx('Answer a few questions', 'Jibu maswali machache')}
+            </button>
+          </div>
+        ) : null}
 
         <div className="reads__btns">
           <button type="button" className="btn btn-primary" onClick={() => nav('/bp')}>
@@ -475,6 +532,8 @@ export function HomePage() {
           {tx('Neema does not diagnose. Alert levels are set by your health team.', 'Neema hatambui ugonjwa. Viwango vya hatari huwekwa na timu ya afya.')}
         </p>
       </section>
+
+      {postpartum && today.delivery && showBaby ? <BabyFirstWeeksCard lang={lang} babies={today.babies} birthDateIso={today.delivery.dateIso} /> : null}
 
       <p className="trust-line">{t('saved_here')}</p>
     </main>

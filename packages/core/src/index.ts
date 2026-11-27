@@ -214,3 +214,27 @@ export {
 } from './registration.js';
 
 export { WHO_ANC_CONTACT_WEEKS, nextAncContact, type AncContact } from './anc.js';
+
+export {
+  KEPI_VISITS,
+  WHO_PNC_CONTACTS,
+  nextKepiVisit,
+  nextPncContact,
+  postpartumProgress,
+  type KepiVisit,
+  type PncContact,
+  type PostpartumProgress,
+} from './postpartum.js';
+
+export {
+  NEWBORN_DANGER_SIGNS,
+  NEWBORN_TIPS,
+  RECOVERY_EMERGENCY_SIGNS,
+  RECOVERY_STAGES,
+  RECOVERY_TODAY_SIGNS,
+  recoveryContentReviewed,
+  recoveryStageFor,
+  type Bi,
+  type RecoveryStage,
+  type RecoveryTopic,
+} from './recoveryTimeline.js';

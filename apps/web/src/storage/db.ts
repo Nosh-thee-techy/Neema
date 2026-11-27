@@ -126,6 +126,39 @@ export interface ClinicalNoteRow {
   text: string;
 }
 
+/** A baby's own record: kept apart from the mother's profile. */
+export interface BabyRow {
+  id: string;
+  /** Same local date as the mother's delivery record. */
+  birthDateIso: string;
+  name?: string;
+  sex?: 'girl' | 'boy';
+  birthWeightG?: number;
+  createdAtMs: number;
+}
+
+export type SleepBand = '0_2' | '3_4' | '5_6' | '7_plus';
+
+/** One guided after-birth check-in. Danger signs also go to the symptoms table for triage. */
+export interface RecoveryCheckinRow {
+  id: string;
+  tsMs: number;
+  /** Days since birth when answered. */
+  dayAfterBirth: number;
+  physical: 'good' | 'okay' | 'unwell';
+  mood: 'good' | 'okay' | 'low' | 'very_low';
+  /** Not asked when the check-in ended early for safety. */
+  sleep?: SleepBand;
+  bleeding?: 'none' | 'lighter' | 'same' | 'heavier' | 'soaking';
+  pain?: 'none' | 'mild' | 'strong';
+  rested?: boolean;
+  exhausted?: boolean;
+  sadOrAnxious?: boolean;
+  overwhelmed?: boolean;
+  supported?: 'yes' | 'some' | 'no';
+  dangerCodes: string[];
+}
+
 export class NeemaDb extends Dexie {
   profile!: Table<ProfileRow, string>;
   vitalsMinutes!: Table<VitalsMinute, number>;
@@ -145,6 +178,8 @@ export class NeemaDb extends Dexie {
   checkins!: Table<CheckIn, string>;
   epds!: Table<EpdsResult, string>;
   clinicalNotes!: Table<ClinicalNoteRow, string>;
+  babies!: Table<BabyRow, string>;
+  recoveryCheckins!: Table<RecoveryCheckinRow, string>;
 
   constructor() {
     super('neema-mama-passport');
@@ -225,6 +260,11 @@ export class NeemaDb extends Dexie {
     // v6: nurse clinical notes, kept apart from the mother's own notes.
     this.version(6).stores({
       clinicalNotes: 'id, tsMs',
+    });
+    // v7: after birth — babies (separate from the mother) and guided recovery check-ins.
+    this.version(7).stores({
+      babies: 'id, birthDateIso',
+      recoveryCheckins: 'id, tsMs',
     });
   }
 }

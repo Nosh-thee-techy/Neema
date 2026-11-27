@@ -29,6 +29,7 @@ export function SummaryPage() {
         stage: profile?.stage ?? 'pregnancy',
         gestationWeeks: profile?.gestationWeeks,
         expectedDeliveryDate: profile?.expectedDeliveryDate,
+        ...(profile?.stage === 'postpartum' && profile.delivery ? { deliveryDate: profile.delivery.dateIso, deliveryMode: profile.delivery.mode } : {}),
         bp,
         symptoms,
         alerts,

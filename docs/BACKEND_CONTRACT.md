@@ -96,3 +96,19 @@ Not an API, but it blocks field use: the triage thresholds need clinician sign-o
 ## 8. Emergency number
 
 `services/emergency.ts` sets `EMERGENCY_NUMBER = '999'`. Kenya also routes 112. The team should confirm the number (and whether a county ambulance line should be offered) before field use.
+
+
+## 9. After birth (postpartum)
+
+**Today:** the birth (`profile.delivery`), baby records (`babies` table) and recovery check-ins (`recoveryCheckins`) live on the phone.
+
+**Needed:**
+- The birth recorded by a nurse at the facility should create the record on the server and sync to the mother's phone, so she does not have to enter it.
+- **Babies need their own records and clinical owner** (the child health clinic), linked to the mother but with separate permissions. Proposed: `POST /api/mothers/:id/babies` (nurse), `GET /api/babies/:id` (child-health staff, mother read-only).
+- Postnatal check and baby vaccine reminders (WHO PNC: day 1, day 3, days 7–14, 6 weeks; KEPI: 6, 10, 14 weeks) by SMS or push, and a CHP prompt for a home visit when a check is missed.
+- Check-ins with danger signs already raise an alert on the phone. A server could also notify the CHP's dashboard and track whether someone responded.
+
+```
+POST /api/mothers/:id/delivery      (nurse or mother)  { dateIso, time?, mode, place?, complications[], babiesCount }
+POST /api/mothers/:id/recovery-checkins   (mother)    { dayAfterBirth, physical, mood, sleep?, bleeding?, dangerCodes[] }
+```

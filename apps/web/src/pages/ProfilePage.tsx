@@ -23,9 +23,10 @@ import { EMPTY_BIRTH_PLAN, allergyAnswerOf, loadConsent, loadProfile, saveConsen
 import { listContacts } from '../services/contacts';
 import { listClinicalNotes, type ClinicalNoteRow } from '../services/clinicalNotes';
 import { progressFromProfile } from '../services/pregnancyProgress';
+import { deliveryMsOf, listBabies, recoveryProgressOf, setShowBabyInfo, undoDelivery } from '../services/delivery';
 import { lockSession } from '../services/auth';
 import { latestEpds } from '../services/epdsStore';
-import { db, type ConsentRow } from '../storage/db';
+import { db, type BabyRow, type ConsentRow } from '../storage/db';
 import { saveOnboarding } from '../hooks/useOnboarding';
 
 type Editing = null | 'personal' | 'pregnancy' | 'health' | 'provider';
@@ -56,6 +57,8 @@ export function ProfilePage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmUndo, setConfirmUndo] = useState(false);
+  const [babies, setBabies] = useState<BabyRow[]>([]);
   const [allergyDraft, setAllergyDraft] = useState<AllergyAnswer>({ noneKnown: false, items: [] });
   const taps = useRef<number[]>([]);
 
@@ -72,6 +75,7 @@ export function ProfilePage() {
     setClinical(n);
     setConsent(cons);
     setEpdsAt(e?.tsMs ?? null);
+    setBabies(await listBabies());
   }
 
   useEffect(() => {
@@ -85,7 +89,10 @@ export function ProfilePage() {
   }, [loc.hash, profile]);
 
   const p: MamaProfile = profile ?? { displayName: '', language: lang, stage: 'pregnancy' };
-  const preg = progressFromProfile(p);
+  const preg = p.stage === 'pregnancy' ? progressFromProfile(p) : null;
+  const after = p.stage === 'postpartum';
+  const recovery = after ? recoveryProgressOf(p) : null;
+  const delivery = after ? p.delivery : undefined;
   const plan: BirthPlan = { ...EMPTY_BIRTH_PLAN, ...p.birthPlan };
   const loc2 = sw ? 'sw-KE' : 'en-KE';
   const d = (ms: number) => new Date(ms).toLocaleDateString(loc2, { day: 'numeric', month: 'long', year: 'numeric' });
@@ -254,6 +261,84 @@ export function ProfilePage() {
     </>
   );
 
+  const MODE = { vaginal: tx('Normal birth', 'Kawaida'), assisted: tx('Assisted', 'Kwa kusaidiwa'), caesarean: tx('Caesarean', 'Upasuaji') } as const;
+  const COMP = {
+    heavy_bleeding: tx('Heavy bleeding', 'Damu nyingi'),
+    high_bp: tx('High blood pressure', 'Shinikizo la juu'),
+    transfusion: tx('Blood transfusion', 'Kuongezewa damu'),
+    infection: tx('Fever or infection', 'Homa au maambukizi'),
+    long_labour: tx('Long or difficult labour', 'Uchungu mrefu'),
+  } as const;
+
+  function BirthSection() {
+    if (!delivery) {
+      return (
+        <Section id="birth" title={tx('Birth', 'Kujifungua')}>
+          <p className="prof-warn">{tx('Birth date not added yet.', 'Tarehe ya kuzaliwa haijaongezwa.')}</p>
+          <Row label={tx('Add birth details', 'Ongeza maelezo ya kujifungua')} onClick={() => nav('/record-birth')} />
+        </Section>
+      );
+    }
+    return (
+      <Section id="birth" title={tx('Birth', 'Kujifungua')}>
+        <dl className="prof-dl">
+          <Item k={tx('Born on', 'Alizaliwa')} v={`${d(deliveryMsOf(p) ?? 0)}${delivery.time ? ` · ${delivery.time}` : ''}`} />
+          <Item k={tx('How', 'Jinsi')} v={MODE[delivery.mode]} />
+          <Item k={tx('Where', 'Wapi')} v={delivery.place === 'facility' ? delivery.facilityName || tx('Health facility', 'Kituo cha afya') : delivery.place === 'home' ? tx('Home', 'Nyumbani') : delivery.place === 'on_the_way' ? tx('On the way', 'Njiani') : ''} />
+          <Item k={tx('During birth', 'Wakati wa kujifungua')} v={[...delivery.complications.map((c) => COMP[c]), delivery.otherComplication ?? ''].filter(Boolean).join(', ') || tx('Nothing recorded', 'Hakuna kilichoandikwa')} />
+          <Item k={tx('Babies', 'Watoto')} v={babyList || String(delivery.babiesCount)} />
+          <Item
+            k={tx('Recorded by', 'Imeandikwa na')}
+            v={delivery.recordedBy.role === 'self' ? tx('Herself', 'Mwenyewe') : `${delivery.recordedBy.name ?? ''} (${delivery.recordedBy.role === 'nurse' ? tx('nurse', 'muuguzi') : 'CHW'})`}
+          />
+        </dl>
+        <label className="row-divided">
+          <input
+            type="checkbox"
+            checked={delivery.showBabyInfo}
+            onChange={async (e) => {
+              await setShowBabyInfo(e.target.checked);
+              await reload();
+            }}
+          />
+          <span>{tx("Show baby care tips on my dashboard", 'Onyesha vidokezo vya kumtunza mtoto kwenye ukurasa wangu')}</span>
+        </label>
+        <Row label={tx('Edit birth details', 'Badilisha maelezo ya kujifungua')} onClick={() => nav('/record-birth')} />
+        {confirmUndo ? (
+          <div className="prof-danger" role="alertdialog" aria-labelledby="undo-title">
+            <strong id="undo-title">{tx('Undo the birth record?', 'Futa rekodi ya kujifungua?')}</strong>
+            <p>{tx('Use this only if it was recorded by mistake. Neema goes back to pregnancy care. Your check-ins and readings stay saved.', 'Tumia hii tu kama iliandikwa kwa makosa. Neema atarudi kwenye huduma ya mimba. Ukaguzi na vipimo vyako vinabaki.')}</p>
+            <div className="prof-edit-btns">
+              <button type="button" className="btn btn-ghost" onClick={() => setConfirmUndo(false)}>
+                {tx('Keep it', 'Iache')}
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={async () => {
+                  await undoDelivery();
+                  await g.refreshTriage();
+                  setConfirmUndo(false);
+                  await reload();
+                }}
+              >
+                {tx('Undo', 'Futa')}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" className="prof-delete" onClick={() => setConfirmUndo(true)}>
+            {tx('Recorded by mistake? Undo', 'Imeandikwa kwa makosa? Futa')}
+          </button>
+        )}
+      </Section>
+    );
+  }
+
+  const babyList = babies
+    .filter((b) => b.birthDateIso === delivery?.dateIso)
+    .map((b, i) => b.name || tx(`Baby ${i + 1}`, `Mtoto ${i + 1}`))
+    .join(', ');
   const chp = contacts.find((c) => c.role === 'chp');
   const family = contacts.filter((c) => c.role === 'family');
   const registrar = p.registeredBy;
@@ -269,8 +354,10 @@ export function ProfilePage() {
           <p>
             {preg
               ? tx(`Week ${preg.weeks} · due ${d(preg.eddMs)}`, `Wiki ${preg.weeks} · kujifungua ${d(preg.eddMs)}`)
-              : p.stage === 'postpartum'
-                ? tx('After birth', 'Baada ya kujifungua')
+              : after
+                ? recovery
+                  ? tx(`Day ${recovery.daysSinceBirth} of recovery · baby born ${d(deliveryMsOf(p) ?? 0)}`, `Siku ${recovery.daysSinceBirth} ya kupona · mtoto alizaliwa ${d(deliveryMsOf(p) ?? 0)}`)
+                  : tx('After birth', 'Baada ya kujifungua')
                 : tx('Pregnancy dates not added', 'Tarehe za mimba hazijaongezwa')}
           </p>
         </div>
@@ -308,16 +395,16 @@ export function ProfilePage() {
       </Section>
 
       {/* Pregnancy */}
-      <Section id="pregnancy" title={tx('Pregnancy', 'Mimba')} onEdit={editing ? undefined : () => startEdit('pregnancy')} editLabel={tx('Edit', 'Badilisha')}>
+      {after ? <BirthSection /> : null}
+
+      <Section
+        id="pregnancy"
+        title={after ? tx('Pregnancy (completed)', 'Mimba (imekamilika)') : tx('Pregnancy', 'Mimba')}
+        onEdit={editing || after ? undefined : () => startEdit('pregnancy')}
+        editLabel={tx('Edit', 'Badilisha')}
+      >
         {editing === 'pregnancy' ? (
           <>
-            <div className="field">
-              <label htmlFor="pf-stage">{tx('Stage', 'Hatua')}</label>
-              <select id="pf-stage" value={form.stage} onChange={(e) => setForm({ ...form, stage: e.target.value })}>
-                <option value="pregnancy">{tx('Pregnant now', 'Mjamzito sasa')}</option>
-                <option value="postpartum">{tx('Gave birth recently', 'Amejifungua karibuni')}</option>
-              </select>
-            </div>
             {form.stage === 'pregnancy' ? (
               <>
                 <div className="field">
@@ -350,12 +437,25 @@ export function ProfilePage() {
           </>
         ) : (
           <dl className="prof-dl">
-            <Item k={tx('Today', 'Leo')} v={preg ? tx(`${preg.weeks} weeks ${preg.days} days · trimester ${preg.trimester}`, `wiki ${preg.weeks} siku ${preg.days} · kipindi ${preg.trimester}`) : p.stage === 'postpartum' ? tx('After birth', 'Baada ya kujifungua') : tx('Not added', 'Haijaongezwa')} />
-            <Item k={tx('Due', 'Kujifungua')} v={preg ? d(preg.eddMs) : ''} />
+            {after ? (
+              <>
+                <Item k={tx('Due date was', 'Tarehe ilikuwa')} v={p.expectedDeliveryDate ? d(parseLocalIsoDate(p.expectedDeliveryDate) ?? 0) : ''} />
+                <Item
+                  k={tx('Length at birth', 'Muda wakati wa kuzaliwa')}
+                  v={delivery?.gestationAtBirth ? tx(`${delivery.gestationAtBirth.weeks} weeks ${delivery.gestationAtBirth.days} days`, `wiki ${delivery.gestationAtBirth.weeks} siku ${delivery.gestationAtBirth.days}`) : ''}
+                />
+              </>
+            ) : (
+              <>
+                <Item k={tx('Today', 'Leo')} v={preg ? tx(`${preg.weeks} weeks ${preg.days} days · trimester ${preg.trimester}`, `wiki ${preg.weeks} siku ${preg.days} · kipindi ${preg.trimester}`) : tx('Not added', 'Haijaongezwa')} />
+                <Item k={tx('Due', 'Kujifungua')} v={preg ? d(preg.eddMs) : ''} />
+              </>
+            )}
             <Item k={tx('First pregnancy', 'Mimba ya kwanza')} v={p.firstPregnancy === undefined ? '' : p.firstPregnancy ? tx('Yes', 'Ndiyo') : tx('No', 'Hapana')} />
             <Item k={tx('Before', 'Kabla')} v={p.previousPregnancies !== undefined ? String(p.previousPregnancies) : ''} />
           </dl>
         )}
+        {!after && !editing ? <Row label={tx('My baby has arrived: record the birth', 'Mtoto amefika: andika kujifungua')} onClick={() => nav('/record-birth')} /> : null}
       </Section>
 
       {/* Contacts */}

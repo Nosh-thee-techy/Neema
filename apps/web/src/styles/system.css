@@ -590,3 +590,9 @@ input[type='checkbox'] {
 .add-panel__roles {
   --n-tabs-count: 3;
 }
+
+/* Confirm-delete / undo buttons must not pulse like an emergency action. */
+.prof-danger .btn-danger,
+.rec-emergency .btn-danger {
+  animation: none;
+}

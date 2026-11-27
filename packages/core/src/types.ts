@@ -22,6 +22,18 @@ export type SymptomCode =
   | 'baby_moving_less'
   | 'swelling_face_hands'
   | 'low_mood'
+  // Danger signs added for after birth (also valid in pregnancy where they apply)
+  | 'dizzy_faint'
+  | 'chest_pain_breathless'
+  | 'fits'
+  | 'severe_abdominal_pain'
+  | 'thoughts_of_harm'
+  | 'foul_discharge'
+  | 'wound_problem'
+  | 'leg_pain_swelling'
+  | 'breast_red_painful'
+  | 'urine_problem'
+  | 'bleeding_heavier'
   | 'other';
 
 /** Identifiers of triage rules, logged with every result for explainability. */
@@ -39,7 +51,10 @@ export type RuleId =
   | 'R11_SIGNAL_INVALID'
   | 'R12_NOTHING_CONCERNING'
   | 'R13_SHOCK_INDEX'
-  | 'R14_SIGNAL_LOST_WITH_SYMPTOMS';
+  | 'R14_SIGNAL_LOST_WITH_SYMPTOMS'
+  | 'R15_EMERGENCY_SIGN'
+  | 'R16_THOUGHTS_OF_HARM'
+  | 'R17_POSTPARTUM_REVIEW_SIGN';
 
 /** Optional daily check-in. CONTEXT ONLY — rules never read it. */
 export interface CheckIn {

@@ -22,6 +22,9 @@ export interface RegistrationInput {
   /** Required while pregnant: weeks+days from the clinic, or a due date. */
   dating: { mode: 'weeks'; weeks: number | null; days: number | null } | { mode: 'due'; dueDateMs: number | null } | null;
   firstPregnancy: boolean | null;
+  /** Required after birth: when and how the baby was born. */
+  deliveryDateMs?: number | null;
+  deliveryMode?: 'vaginal' | 'assisted' | 'caesarean' | null;
   previousPregnancies?: number | null;
   allergies?: AllergyAnswer;
   chpName?: string;
@@ -43,6 +46,8 @@ export type RegistrationField =
   | 'dueDate'
   | 'firstPregnancy'
   | 'previousPregnancies'
+  | 'deliveryDate'
+  | 'deliveryMode'
   | 'allergies'
   | 'chpName'
   | 'chpPhone'
@@ -62,6 +67,7 @@ export type RegistrationError =
   | 'due_date_out_of_range'
   | 'number_out_of_range'
   | 'contradictory'
+  | 'future_date'
   | 'name_required_with_phone';
 
 export type RegistrationErrors = Partial<Record<RegistrationField, RegistrationError>>;
@@ -109,6 +115,14 @@ export function validateRegistration(i: RegistrationInput): RegistrationErrors {
       const n = i.previousPregnancies;
       if (!Number.isInteger(n) || n < 1 || n > 20) e.previousPregnancies = 'number_out_of_range';
     }
+  }
+
+  if (i.stage === 'postpartum') {
+    const d = i.deliveryDateMs;
+    if (d == null || !Number.isFinite(d)) e.deliveryDate = 'required';
+    else if (d > i.nowMs) e.deliveryDate = 'future_date';
+    else if (i.nowMs - d > 366 * DAY) e.deliveryDate = 'invalid_date';
+    if (!i.deliveryMode) e.deliveryMode = 'required';
   }
 
   if (i.allergies && isContradictory(i.allergies)) e.allergies = 'contradictory';

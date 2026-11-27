@@ -153,6 +153,11 @@ export function TeamPage() {
         <Button variant="secondary" onClick={() => nav('/sign')}>
           {lang === 'sw' ? 'Ishara (majaribio)' : 'Sign talk (lab)'}
         </Button>
+        <Button variant="secondary" onClick={() => nav('/record-birth?by=nurse')}>
+          {lang === 'sw' ? 'Andika kujifungua' : 'Record a birth'}
+        </Button>
+      </div>
+      <div className="btn-row" style={{ marginTop: '0.75rem' }}>
         <Button variant="secondary" onClick={() => nav('/check-in')}>
           {lang === 'sw' ? 'Ukaguzi wa CHP' : 'CHP check-in'}
         </Button>

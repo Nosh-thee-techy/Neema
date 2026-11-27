@@ -1,31 +1,31 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { getDefaultTriageConfig, reasonPhrase, topReason, type AlertRecord, type BpReading, type SymptomCode, type SymptomReport } from '@neema/core';
+import { getDefaultTriageConfig, reasonPhrase, topReason, type AlertRecord, type BpReading, type SymptomReport } from '@neema/core';
 import { useGuardian } from '../hooks/useGuardian';
 import { useLocale } from '../hooks/useLocale';
 import { useVitalsTrend } from '../hooks/useVitalsTrend';
 import { TonightCard, TrendCard } from '../ui/VitalsDashboard';
-import { db, type VisitRecord } from '../storage/db';
+import { db, type RecoveryCheckinRow, type VisitRecord } from '../storage/db';
 import { listVisits, newVisit, saveVisit } from '../services/visits';
 import { Segmented } from '../ui/Segmented';
+import { SYMPTOM_LABELS } from '../services/symptomLabels';
+import { SLEEP_TEXT } from '../ui/RecoveryParts';
 import { listClinicalNotes, type ClinicalNoteRow } from '../services/clinicalNotes';
 import { loadProfile } from '../services/passport';
+import { deliveryMsOf } from '../services/delivery';
 
 const CONFIG = getDefaultTriageConfig();
+const WORDS: Record<string, [string, string]> = {
+  good: ['good', 'nzuri'],
+  okay: ['okay', 'sawa'],
+  unwell: ['unwell', 'si vizuri'],
+  low: ['low', 'chini'],
+  very_low: ['very low', 'chini sana'],
+};
 
 type Tab = 'readings' | 'alerts' | 'visits' | 'notes';
 
-const SYMPTOMS: Record<SymptomCode, { en: string; sw: string }> = {
-  headache: { en: 'Headache', sw: 'Kichwa kuuma' },
-  blurred_vision: { en: 'Blurred vision', sw: 'Kuona ukungu' },
-  upper_abdominal_pain: { en: 'Upper belly pain', sw: 'Maumivu juu ya tumbo' },
-  heavy_bleeding: { en: 'Heavy bleeding', sw: 'Kutokwa damu nyingi' },
-  fever_chills: { en: 'Fever / chills', sw: 'Homa / baridi' },
-  baby_moving_less: { en: 'Baby moving less', sw: 'Mtoto anasonga kidogo' },
-  swelling_face_hands: { en: 'Swelling face/hands', sw: 'Uvimbe uso/mikono' },
-  low_mood: { en: 'Low mood', sw: 'Huzuni' },
-  other: { en: 'Other', sw: 'Nyingine' },
-};
+const SYMPTOMS = SYMPTOM_LABELS;
 
 /** Health History: readings, alerts, clinic visits, and notes (hers vs the nurse's). */
 export function HistoryPage() {
@@ -45,6 +45,8 @@ export function HistoryPage() {
   const [visits, setVisits] = useState<VisitRecord[]>([]);
   const [clinical, setClinical] = useState<ClinicalNoteRow[]>([]);
   const [myNotes, setMyNotes] = useState<string>('');
+  const [checkins, setCheckins] = useState<RecoveryCheckinRow[]>([]);
+  const [birth, setBirth] = useState<{ ms: number; mode: string } | null>(null);
   const [visitType, setVisitType] = useState<VisitRecord['type']>('antenatal');
   const [visitFacility, setVisitFacility] = useState('');
   const [visitDate, setVisitDate] = useState('');
@@ -65,6 +67,9 @@ export function HistoryPage() {
       setVisits(v);
       setClinical(c);
       setMyNotes(p?.healthNotes ?? '');
+      setCheckins(await db.recoveryCheckins.orderBy('tsMs').reverse().limit(30).toArray());
+      const bms = deliveryMsOf(p);
+      setBirth(bms !== null && p?.delivery ? { ms: bms, mode: p.delivery.mode } : null);
     })();
   }, [g.triage?.level, g.activeAlertId]);
 
@@ -154,6 +159,31 @@ export function HistoryPage() {
           <TonightCard lang={lang} sample={g.sample} connected={g.connected} trend={trend} />
           <TrendCard lang={lang} trend={trend} />
 
+          {checkins.length ? (
+            <div className="home-card">
+              <div className="hist-head">
+                <h2>{tx('Recovery check-ins', 'Ukaguzi wa kupona')}</h2>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => nav('/recovery-check')}>
+                  + {tx('Check in', 'Jibu')}
+                </button>
+              </div>
+              <ul className="hist-list">
+                {checkins.map((c) => (
+                  <li key={c.id} data-tone={c.dangerCodes.length ? 'alert' : c.mood === 'low' || c.mood === 'very_low' || c.physical === 'unwell' ? 'watch' : 'calm'}>
+                    <span className="hist-list__main">
+                      {tx(`Day ${c.dayAfterBirth}`, `Siku ${c.dayAfterBirth}`)} · {tx('body', 'mwili')}: {WORDS[c.physical][sw ? 1 : 0]} · {tx('mood', 'hisia')}: {WORDS[c.mood][sw ? 1 : 0]}
+                      {c.sleep ? ` · ${tx('sleep', 'usingizi')}: ${SLEEP_TEXT[c.sleep][sw ? 1 : 0]}` : ''}
+                    </span>
+                    {c.dangerCodes.length ? (
+                      <span className="hist-list__flag">{c.dangerCodes.map((k) => (SYMPTOMS as Record<string, { en: string; sw: string }>)[k]?.[sw ? 'sw' : 'en'] ?? k).join(', ')}</span>
+                    ) : null}
+                    <span className="hist-list__time">{dt(c.tsMs)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
           <div className="home-card">
             <div className="hist-head">
               <h2>{tx('Symptoms you logged', 'Dalili ulizoandika')}</h2>
@@ -217,6 +247,12 @@ export function HistoryPage() {
         <section id="hist-panel-visits" role="tabpanel" aria-labelledby="hist-tab-visits" tabIndex={0} className="hist-panel">
           <div className="home-card">
             <h2 className="hist-h2">{tx('Clinic visits', 'Ziara za kliniki')}</h2>
+            {birth ? (
+              <p className="hist-birth">
+                <strong>{tx('Baby born', 'Mtoto alizaliwa')}</strong> · {d(birth.ms)} ·{' '}
+                {birth.mode === 'caesarean' ? tx('caesarean', 'upasuaji') : birth.mode === 'assisted' ? tx('assisted', 'kwa kusaidiwa') : tx('normal birth', 'kawaida')}
+              </p>
+            ) : null}
             {visits.length === 0 ? (
               <p className="hist-empty">{tx('No visits recorded.', 'Hakuna ziara.')}</p>
             ) : (

@@ -201,6 +201,42 @@ export function evaluateTriage(
     });
   }
 
+  // R15 emergency danger signs reported by the mother (DRAFT rule: clinician sign-off pending).
+  // Fainting, chest pain/breathlessness, fits and severe tummy pain are emergencies at any stage.
+  // After birth, a headache together with blurred vision is also treated as an emergency
+  // (dangerous blood pressure can start after birth, even before BP is measured).
+  const emergencySign =
+    symptoms.has('dizzy_faint') ||
+    symptoms.has('chest_pain_breathless') ||
+    symptoms.has('fits') ||
+    symptoms.has('severe_abdominal_pain') ||
+    (input.stage === 'postpartum' && symptoms.has('headache') && symptoms.has('blurred_vision'));
+  if (emergencySign) {
+    add({ level: 'RED', rule: 'R15_EMERGENCY_SIGN', reason: 'emergency_sign', messageKey: 'red_go_now' });
+  }
+
+  // R16 thoughts of harming herself or her baby: a person must respond now.
+  if (symptoms.has('thoughts_of_harm')) {
+    add({ level: 'RED', rule: 'R16_THOUGHTS_OF_HARM', reason: 'thoughts_of_harm', messageKey: 'red_talk_now' });
+  }
+
+  // R17 after-birth signs that need a health worker the same day (DRAFT rule).
+  if (
+    symptoms.has('foul_discharge') ||
+    symptoms.has('wound_problem') ||
+    symptoms.has('leg_pain_swelling') ||
+    symptoms.has('breast_red_painful') ||
+    symptoms.has('urine_problem') ||
+    symptoms.has('bleeding_heavier')
+  ) {
+    add({
+      level: 'YELLOW',
+      rule: 'R17_POSTPARTUM_REVIEW_SIGN',
+      reason: 'review_sign_today',
+      messageKey: 'yellow_review_today',
+    });
+  }
+
   // R10 reduced baby movement (pregnancy only)
   if (input.stage === 'pregnancy' && symptoms.has('baby_moving_less')) {
     const weeks = input.gestationWeeks;

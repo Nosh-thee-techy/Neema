@@ -30,8 +30,12 @@ describe('validateRegistration', () => {
     expect(validateRegistration({ ...ok, dating: { mode: 'due', dueDateMs: now - 200 * 86_400_000 } }).dueDate).toBe('due_date_out_of_range');
   });
 
-  it('does not ask for weeks after birth', () => {
-    expect(validateRegistration({ ...ok, stage: 'postpartum', dating: null, firstPregnancy: null })).toEqual({});
+  it('after birth: no weeks, but the birth date and how the baby was born are required', () => {
+    expect(validateRegistration({ ...ok, stage: 'postpartum', dating: null, firstPregnancy: null })).toEqual({ deliveryDate: 'required', deliveryMode: 'required' });
+    expect(
+      validateRegistration({ ...ok, stage: 'postpartum', dating: null, firstPregnancy: null, deliveryDateMs: now - 5 * 86_400_000, deliveryMode: 'caesarean' }),
+    ).toEqual({});
+    expect(validateRegistration({ ...ok, stage: 'postpartum', deliveryDateMs: now + 86_400_000, deliveryMode: 'vaginal' }).deliveryDate).toBe('future_date');
   });
 
   it('health workers must give their name; basic phones need a number', () => {

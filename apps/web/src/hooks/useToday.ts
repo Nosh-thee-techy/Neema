@@ -3,11 +3,12 @@
  */
 
 import { useEffect, useState } from 'react';
-import type { BpReading, PregnancyProgress, Stage } from '@neema/core';
-import { loadProfile } from '../services/passport';
+import type { BpReading, PostpartumProgress, PregnancyProgress, Stage } from '@neema/core';
+import { loadProfile, type DeliveryRecord } from '../services/passport';
+import { recoveryProgressOf } from '../services/delivery';
 import { contactReadiness } from '../services/contacts';
 import { progressFromProfile } from '../services/pregnancyProgress';
-import { db } from '../storage/db';
+import { db, type BabyRow, type RecoveryCheckinRow } from '../storage/db';
 
 export interface TodaySnapshot {
   /** Name from the passport, or null when none is saved or it is locked. */
@@ -25,6 +26,13 @@ export interface TodaySnapshot {
   /** null until loaded; false means alerts have no real CHP to go to. */
   hasRealChp: boolean | null;
   placeholderContacts: number;
+  /** After birth: the delivery record, days since birth, babies and recent check-ins. */
+  delivery: DeliveryRecord | null;
+  recovery: PostpartumProgress | null;
+  babies: BabyRow[];
+  /** Up to the last 7 recovery check-ins, newest first. */
+  recoveryCheckins: RecoveryCheckinRow[];
+  recoveryCheckinToday: boolean;
 }
 
 const EMPTY: TodaySnapshot = {
@@ -39,6 +47,11 @@ const EMPTY: TodaySnapshot = {
   symptomsToday: false,
   hasRealChp: null,
   placeholderContacts: 0,
+  delivery: null,
+  recovery: null,
+  babies: [],
+  recoveryCheckins: [],
+  recoveryCheckinToday: false,
 };
 
 function startOfLocalDay(nowMs: number): number {
@@ -58,11 +71,13 @@ export function useToday(refreshKey: unknown): TodaySnapshot {
     let cancelled = false;
     void (async () => {
       const dayStart = startOfLocalDay(Date.now());
-      const [profile, recentDesc, lastSymptom, contacts] = await Promise.all([
+      const [profile, recentDesc, lastSymptom, contacts, babies, checkins] = await Promise.all([
         loadProfile().catch(() => null),
         db.bp.orderBy('tsMs').reverse().limit(7).toArray(),
         db.symptoms.orderBy('tsMs').last(),
         contactReadiness(),
+        db.babies.toArray().catch(() => [] as BabyRow[]),
+        db.recoveryCheckins.orderBy('tsMs').reverse().limit(7).toArray().catch(() => [] as RecoveryCheckinRow[]),
       ]);
       if (cancelled) return;
       const pregnant = profile?.stage === 'pregnancy';
@@ -75,6 +90,11 @@ export function useToday(refreshKey: unknown): TodaySnapshot {
         stage: profile?.stage ?? null,
         lastBp: lastBp ?? null,
         recentBp: recentDesc.slice().reverse(),
+        delivery: profile?.stage === 'postpartum' ? (profile.delivery ?? null) : null,
+        recovery: profile?.stage === 'postpartum' ? recoveryProgressOf(profile) : null,
+        babies: profile?.delivery ? babies.filter((b) => b.birthDateIso === profile.delivery!.dateIso) : [],
+        recoveryCheckins: checkins,
+        recoveryCheckinToday: Boolean(checkins[0] && checkins[0].tsMs >= dayStart),
         bpToday: Boolean(lastBp && lastBp.tsMs >= dayStart),
         lastSymptomTsMs: lastSymptom?.tsMs ?? null,
         symptomsToday: Boolean(lastSymptom && lastSymptom.tsMs >= dayStart),

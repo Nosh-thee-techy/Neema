@@ -30,6 +30,9 @@ const GLOSSES: Record<string, string> = {
   red_sos: 'SOS signal received. Open the message for help. Go to a facility if you can.',
   unknown_check_band: 'Check your band. There is no valid data right now.',
   epds_ok: 'Thank you mama. Your answers are kept private on this phone.',
+  red_talk_now:
+    'Please talk to someone right now. Call your CHP or someone you trust, or call 1199 free. You are not alone.',
+  yellow_review_today: 'This sign needs a health worker today. Contact your CHP or go to the clinic today.',
   epds_talk_to_person:
     'Please talk to a health worker or someone you trust. This is not a diagnosis — it is support.',
 };
