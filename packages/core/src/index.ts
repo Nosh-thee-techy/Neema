@@ -171,3 +171,20 @@ export {
   type CareGuideContext,
   type CareUrgency,
 } from './careCards.js';
+
+export {
+  FULL_TERM_DAYS,
+  eddFromGestationalAge,
+  isValidGestationalAge,
+  pregnancyProgress,
+  trimesterFor,
+  type PregnancyDating,
+  type PregnancyProgress,
+} from './pregnancy.js';
+
+export {
+  WEEKLY_INSIGHTS,
+  insightForWeek,
+  weeklyInsightsReviewed,
+  type WeeklyInsight,
+} from './weeklyInsights.js';

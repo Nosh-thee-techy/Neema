@@ -26,6 +26,39 @@ export interface MamaProfile {
   discreetMode?: boolean;
   /** Birth preparedness checklist — not a risk score. */
   birthPlan?: BirthPlan;
+
+  // ── Registration v2 (mother-first redesign) ──────────────────────────
+  /** Full name as on ID / clinic card. displayName is what Neema calls her. */
+  fullName?: string;
+  /** ISO date (YYYY-MM-DD). */
+  dateOfBirth?: string;
+  /** Village / estate / ward — free text, used by the CHP to find her. */
+  location?: string;
+  /** Gestational age as told by the clinic, plus the day it was recorded, so it advances. */
+  gaWeeks?: number;
+  gaDays?: number;
+  gaRecordedOnMs?: number;
+  firstPregnancy?: boolean;
+  /** Ongoing conditions she or the nurse noted (free text items). */
+  conditions?: string[];
+  /** The mother's own notes. Clinical notes live in a separate table. */
+  healthNotes?: string;
+  registeredBy?: RegisteredBy;
+  /** Clinic / provider info if known. */
+  facilityName?: string;
+  nurseName?: string;
+  /** When the registration wizard finished. */
+  registeredAtMs?: number;
+}
+
+export type RegistrarRole = 'self' | 'chw' | 'nurse';
+
+export interface RegisteredBy {
+  role: RegistrarRole;
+  /** Name of the CHW / nurse who registered her (blank for self). */
+  name?: string;
+  /** Optional staff / CHW ID. */
+  staffId?: string;
 }
 
 export const EMPTY_BIRTH_PLAN: BirthPlan = {

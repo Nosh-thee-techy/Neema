@@ -9,6 +9,7 @@ import {
   isCatalogFullyReviewed,
   isConfigSignedForUse,
   pendingMessageKeys,
+  weeklyInsightsReviewed,
   type HardwareValidationReport,
   type MessageEntry,
   type SignedTriageConfig,
@@ -32,6 +33,7 @@ export interface ReadinessReport {
   sessionUnlocked: boolean;
   consentOnFile: boolean;
   chpContactOnFile: boolean;
+  weeklyContentReviewed: boolean;
   blockers: string[];
 }
 
@@ -114,6 +116,8 @@ export async function getReadiness(): Promise<ReadinessReport> {
   if (!consentOnFile) blockers.push('No consent record on file.');
   if (!contacts.hasRealChp) blockers.push('No CHP phone number saved.');
   if (contacts.placeholders.length) blockers.push('Some contacts still have placeholder numbers.');
+  const weeklyContentReviewed = weeklyInsightsReviewed();
+  if (!weeklyContentReviewed) blockers.push('Weekly pregnancy cards are drafts: need nurse/midwife review and Swahili check.');
 
   return {
     demoAllowed: true,
@@ -129,6 +133,7 @@ export async function getReadiness(): Promise<ReadinessReport> {
     sessionUnlocked,
     consentOnFile,
     chpContactOnFile: contacts.hasRealChp,
+    weeklyContentReviewed,
     blockers,
   };
 }

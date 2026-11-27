@@ -109,6 +109,19 @@ export interface HardwareReportRow {
   disclaimer: string;
 }
 
+/**
+ * A note written by a nurse or CHW. The mother can read it but not edit or delete it
+ * in the app. NOTE: on-device only — not tamper-proof until a clinic backend signs notes.
+ */
+export interface ClinicalNoteRow {
+  id: string;
+  tsMs: number;
+  authorRole: 'nurse' | 'chw';
+  authorName: string;
+  facilityName?: string;
+  text: string;
+}
+
 export class NeemaDb extends Dexie {
   profile!: Table<ProfileRow, string>;
   vitalsMinutes!: Table<VitalsMinute, number>;
@@ -127,6 +140,7 @@ export class NeemaDb extends Dexie {
   followups!: Table<FollowUp, string>;
   checkins!: Table<CheckIn, string>;
   epds!: Table<EpdsResult, string>;
+  clinicalNotes!: Table<ClinicalNoteRow, string>;
 
   constructor() {
     super('neema-mama-passport');
@@ -203,6 +217,10 @@ export class NeemaDb extends Dexie {
       followups: 'alertId, stage',
       checkins: 'id, tsMs',
       epds: 'id, tsMs',
+    });
+    // v6: nurse clinical notes, kept apart from the mother's own notes.
+    this.version(6).stores({
+      clinicalNotes: 'id, tsMs',
     });
   }
 }
