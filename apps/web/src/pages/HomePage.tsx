@@ -307,7 +307,7 @@ export function HomePage() {
         {preg ? (
           <>
             <div className="preg2__top">
-              <BabyStageArt week={preg.weeks} label={babyLabel} />
+              <BabyStageArt week={preg.weeks} days={preg.days} label={babyLabel} />
               <div className="preg2__stats">
                 <p className="home-card__eyebrow" id="preg-title">
                   {tx('Your pregnancy', 'Mimba yako')}
