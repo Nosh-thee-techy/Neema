@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getDefaultTriageConfig, insightForWeek, nextAncContact, type BpReading } from '@neema/core';
+import { RECOVERY_EMERGENCY_SIGNS, babyStageFor, getDefaultTriageConfig, insightForWeek, nextAncContact, nextPncContact, recoveryStageFor, type BpReading } from '@neema/core';
 import { useGuardian } from '../hooks/useGuardian';
 import { useLocale } from '../hooks/useLocale';
 import { useToday } from '../hooks/useToday';
@@ -12,9 +12,9 @@ import { recheckDelayMs } from '../services/recheck';
 import { openEmergencyDialer } from '../services/emergency';
 import { LoadingScreen } from '../ui/LoadingScreen';
 import { EmergencyHoldButton } from '../ui/EmergencyHoldButton';
-import { BabyStageArt } from '../ui/BabyStageArt';
-import { BabyFirstWeeksCard, RecordBirthPrompt, RecoveryCheckinCard, RecoveryExpectCard, RecoveryWelcome, SLEEP_TEXT } from '../ui/RecoveryParts';
-import { IconBell, IconChat, IconChevron, IconHeart, IconMoon, IconPressure, IconTemp } from '../ui/icons';
+import { BabyStageArt, NewbornArt } from '../ui/BabyStageArt';
+import { SLEEP_TEXT, recoveryDayText } from '../ui/RecoveryParts';
+import { IconBell, IconChat, IconChevron, IconHeart, IconMoon, IconPlus, IconPressure, IconSpark, IconTemp } from '../ui/icons';
 
 /** Thresholds come from the (placeholder, unsigned) triage config, never from this file. */
 const CONFIG = getDefaultTriageConfig();
@@ -85,8 +85,8 @@ export function HomePage() {
   const trend = useVitalsTrend(`${level}:${g.demoStep ?? ''}`);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [openLoops, setOpenLoops] = useState(0);
+  const cardsRef = useRef<HTMLDivElement | null>(null);
   const [awaitingArrival, setAwaitingArrival] = useState(false);
-  const [insightOpen, setInsightOpen] = useState(false);
 
   useEffect(() => {
     const id = window.setInterval(() => setNowMs(Date.now()), 60_000);
@@ -202,7 +202,6 @@ export function HomePage() {
   const fmtDate = (ms: number) =>
     new Date(ms).toLocaleDateString(sw ? 'sw-KE' : 'en-KE', { day: 'numeric', month: 'long', year: 'numeric' });
 
-  const dateLine = new Date(nowMs).toLocaleDateString(sw ? 'sw-KE' : 'en-KE', { weekday: 'long', day: 'numeric', month: 'long' });
 
   const anc = preg ? nextAncContact(preg.weeks) : null;
   const postpartum = today.stage === 'postpartum';
@@ -212,12 +211,68 @@ export function HomePage() {
     ? tx(`Illustration of a baby at about ${preg.weeks} weeks (not to scale)`, `Mchoro wa mtoto wa karibu wiki ${preg.weeks} (si kwa kipimo halisi)`)
     : '';
 
+  // ── Daily insight cards (change with the week / day) ───────────────────
+  interface Card {
+    id: string;
+    kicker: string;
+    title: string;
+    text: string;
+    tone: 'peach' | 'lilac' | 'blue' | 'red' | 'green' | 'navy';
+    to: string;
+  }
+  const L = (x: { en: string; sw: string }) => x[lang];
+  /** "12 days" / "5 weeks, 3 days" — the baby's age (= days since birth). */
+  const ageShort = (n: number) => {
+    if (n === 0) return tx('Born today', 'Amezaliwa leo');
+    if (n < 14) return tx(`${n} day${n === 1 ? '' : 's'} old`, `Siku ${n}`);
+    const w = Math.floor(n / 7);
+    const dd = n % 7;
+    return dd ? tx(`${w} weeks, ${dd} days`, `Wiki ${w}, siku ${dd}`) : tx(`${w} weeks`, `Wiki ${w}`);
+  };
+  const cards: Card[] = [];
+  if (postpartum && today.recovery) {
+    const d = today.recovery.daysSinceBirth;
+    const st = recoveryStageFor(d);
+    const pnc = nextPncContact(d);
+    cards.push({ id: 'recovery', kicker: `${tx('Your recovery', 'Kupona kwako')} · ${L(st.title)}`, title: L(st.range), text: L(st.intro), tone: 'peach', to: '/insights' });
+    cards.push({ id: 'help', kicker: tx('When to get help', 'Wakati wa kutafuta msaada'), title: tx('Go now or call 999 if', 'Nenda sasa au piga 999 kama'), text: RECOVERY_EMERGENCY_SIGNS.slice(0, 3).map(L).join(' · '), tone: 'red', to: '/insights#help' });
+    cards.push({ id: 'normal', kicker: tx('What may be normal', 'Kinachoweza kuwa kawaida'), title: L(st.normal[0]!), text: st.normal.slice(1, 3).map(L).join(' · '), tone: 'green', to: '/insights' });
+    if (showBaby) {
+      const bs = babyStageFor(d);
+      cards.push({ id: 'baby', kicker: `${tx('Your baby', 'Mtoto wako')} · ${L(bs.title)}`, title: L(bs.headline), text: bs.doing.slice(0, 2).map(L).join(' · '), tone: 'lilac', to: '/insights#baby' });
+    }
+    if (pnc) cards.push({ id: 'check', kicker: pnc.dueNow ? tx('Due now', 'Sasa') : tx('Next check', 'Ukaguzi ujao'), title: pnc.contact[lang], text: tx('Recommended postnatal check. Your clinic sets the real date.', 'Ukaguzi unaopendekezwa. Kliniki yako huweka tarehe halisi.'), tone: 'blue', to: '/insights' });
+    cards.push({ id: 'mood', kicker: tx('Sleep & mood', 'Usingizi na hisia'), title: tx('How are you sleeping?', 'Unalalaje?'), text: tx('See your sleep and mood, and people you can talk to.', 'Ona usingizi na hisia zako, na watu unaoweza kuzungumza nao.'), tone: 'navy', to: '/wellbeing' });
+  } else if (preg && insight) {
+    cards.push({ id: 'baby', kicker: tx(`Your baby · week ${preg.weeks}`, `Mtoto wako · wiki ${preg.weeks}`), title: sw ? insight.sizeSw : insight.sizeEn, text: sw ? insight.babySw : insight.babyEn, tone: 'peach', to: '/insights' });
+    cards.push({ id: 'feel', kicker: tx('You may feel', 'Unaweza kuhisi'), title: tx('Your body this week', 'Mwili wako wiki hii'), text: sw ? insight.feelSw : insight.feelEn, tone: 'lilac', to: '/insights' });
+    if (anc) cards.push({ id: 'expect', kicker: tx('What to expect', 'Cha kutarajia'), title: tx(`Clinic visit around week ${anc.week}`, `Kliniki karibu wiki ${anc.week}`), text: tx(`Visit ${anc.number} of 8 recommended. Your clinic gives your real date.`, `Ziara ${anc.number} kati ya 8 zinazopendekezwa. Kliniki hukupa tarehe halisi.`), tone: 'blue', to: '/insights' });
+    cards.push({ id: 'help', kicker: tx('Get help straight away if', 'Tafuta msaada mara moja kama'), title: tx('Danger signs this week', 'Dalili za hatari wiki hii'), text: sw ? insight.watchSw : insight.watchEn, tone: 'red', to: '/insights#help' });
+    cards.push({ id: 'do', kicker: tx('Good to do', 'Vizuri kufanya'), title: tx('This week', 'Wiki hii'), text: sw ? insight.doSw : insight.doEn, tone: 'green', to: '/insights' });
+  }
+  const cardKey = cards.map((c) => c.id).join(',');
+  cards.push({ id: 'chat', kicker: 'CareChat', title: tx('Ask Neema anything', 'Muulize Neema chochote'), text: tx('Talk about how you feel, in English or Kiswahili.', 'Ongea kuhusu unavyojisikia, kwa Kiingereza au Kiswahili.'), tone: 'navy', to: '/care' });
+
+  // Scroll snapping keeps the previously snapped card in view when cards load; start at the first.
+  useEffect(() => {
+    if (cardsRef.current) cardsRef.current.scrollLeft = 0;
+  }, [cardKey]);
+
   return (
-    <main className="screen screen--home home2" data-level={level}>
+    <main className="screen screen--home today" data-level={level} data-stage={postpartum ? 'postpartum' : 'pregnancy'}>
       {g.loading ? <LoadingScreen /> : null}
 
-      <header className="home2__bar">
-        <p className="home2__date">{dateLine}</p>
+      <header className="today-top">
+        <button type="button" className="today-avatar" aria-label={tx('Settings', 'Mipangilio')} onClick={() => nav('/settings')}>
+          {(name || 'M').charAt(0).toUpperCase()}
+          {today.hasRealChp === false ? <span className="icon-btn__dot" aria-hidden /> : null}
+        </button>
+        <div className="today-top__mid">
+          <p className="today-top__date">{new Date(nowMs).toLocaleDateString(sw ? 'sw-KE' : 'en-KE', { day: 'numeric', month: 'long' })}</p>
+          <h1 className="home2__hello today-top__hello">
+            {t(greetingKey(new Date(nowMs).getHours()))}, {name}
+          </h1>
+        </div>
         <div className="home2__actions">
           <button
             type="button"
@@ -232,12 +287,8 @@ export function HomePage() {
         </div>
       </header>
 
-      {/* FIRST: greeting */}
-      <h1 className="home2__hello">
-        {t(greetingKey(new Date(nowMs).getHours()))}, {name}
-      </h1>
+      <WeekStrip nowMs={nowMs} lang={lang} />
 
-      {/* Safety: an active alert always shows right under the greeting. */}
       {alertActive ? (
         <section className="home-alert" data-level={level} role="alert" aria-live="assertive">
           <strong className="home-alert__title">{level === 'RED' ? t('call_chp') : t('check_bp')}</strong>
@@ -283,66 +334,60 @@ export function HomePage() {
         </section>
       ) : null}
 
-      {today.hasRealChp === false ? (
-        <button type="button" className="home-alert home-alert--setup" data-testid="no-chp-warning" onClick={() => nav('/contacts?setup=1')}>
-          <strong className="home-alert__title">{tx('No CHP number saved', 'Hakuna namba ya CHP')}</strong>
-          <span className="home-alert__body">
-            {today.placeholderContacts > 0
-              ? tx('Only sample numbers are saved. Add a real number so alerts reach someone.', 'Kuna namba za mfano tu. Weka namba halisi ili tahadhari imfikie mtu.')
-              : tx('Alerts will reach no one. Tap here to add your CHP.', 'Tahadhari haitamfikia mtu. Gusa hapa kuongeza CHP wako.')}
-          </span>
-        </button>
-      ) : null}
-
-      {postpartum ? (
-        <>
-          {today.recovery ? (
-            <RecoveryWelcome recovery={today.recovery} babies={today.babies} showBaby={showBaby} lang={lang} />
-          ) : null}
-          <RecoveryCheckinCard lang={lang} last={today.recoveryCheckins[0]} doneToday={today.recoveryCheckinToday} />
-          {today.recovery ? <RecoveryExpectCard lang={lang} days={today.recovery.daysSinceBirth} mode={today.delivery?.mode} /> : <RecordBirthPrompt lang={lang} />}
-        </>
-      ) : (
-        <>
-      {/* SECOND: daily check-in */}
-      <section className="checkin2" aria-labelledby="checkin-title">
-        <span className="checkin2__icon" aria-hidden>
-          <IconChat />
-        </span>
-        <h2 id="checkin-title" className="checkin2__title">
-          {tx('How are you feeling today?', 'Unajisikiaje leo?')}
-        </h2>
-        <p className="checkin2__sub">{tx("Talk to Neema about how you're feeling.", 'Ongea na Neema kuhusu unavyojisikia.')}</p>
-        {today.symptomsToday ? (
-          <p className="checkin2__done">{tx('You shared how you feel today. Tell Neema if anything changes.', 'Umeeleza unavyojisikia leo. Mwambie Neema kitu kikibadilika.')}</p>
-        ) : null}
-        <button type="button" className="btn checkin2__btn" onClick={() => nav('/care')}>
-          {tx('Start Daily Check-in', 'Anza Ukaguzi wa Leo')}
-        </button>
-        <button type="button" className="checkin2__alt" onClick={() => nav('/symptoms')}>
-          {tx('Or log a symptom', 'Au andika dalili')}
-        </button>
-      </section>
-
-      {/* THIRD: pregnancy progress + this week, one card */}
-      <section className="home-card preg2" aria-labelledby="preg-title">
-        {preg ? (
-          <>
-            <div className="preg2__top">
+      {/* Hero: the baby, floating */}
+      <section className="today-hero" aria-labelledby="today-label">
+        <div className="today-hero__art" aria-hidden={false}>
+          <span className="today-hero__orb today-hero__orb--1" aria-hidden />
+          <span className="today-hero__orb today-hero__orb--2" aria-hidden />
+          <span className="today-hero__orb today-hero__orb--3" aria-hidden />
+          <div className="today-float">
+            {postpartum && today.recovery ? (
+              showBaby ? (
+                <NewbornArt ageDays={today.recovery.daysSinceBirth} label={tx(`Illustration of your baby at ${today.recovery.daysSinceBirth} days`, `Mchoro wa mtoto wako wa siku ${today.recovery.daysSinceBirth}`)} />
+              ) : (
+                <RecoveryArt label={tx('Your recovery', 'Kupona kwako')} />
+              )
+            ) : preg ? (
               <BabyStageArt week={preg.weeks} days={preg.days} label={babyLabel} />
-              <div className="preg2__stats">
-                <p className="home-card__eyebrow" id="preg-title">
-                  {tx('Your pregnancy', 'Mimba yako')}
-                </p>
-                <p className="preg__week">
-                  {tx(`Week ${preg.weeks}`, `Wiki ${preg.weeks}`)}
-                  <span> {tx(`· day ${preg.days}`, `· siku ${preg.days}`)}</span>
-                </p>
-                <span className="preg__tri">{tx(`Trimester ${preg.trimester}`, `Kipindi ${preg.trimester}`)}</span>
-              </div>
-            </div>
+            ) : (
+              <RecoveryArt label={tx('Neema', 'Neema')} />
+            )}
+          </div>
+        </div>
+
+        {postpartum ? (
+          today.recovery ? (
+            <>
+              <button type="button" id="today-label" className="today-label" onClick={() => nav('/insights')}>
+                {ageShort(today.recovery.daysSinceBirth)}
+                <span className="today-label__chev" aria-hidden>
+                  <IconChevron />
+                </span>
+              </button>
+              <p className="today-sub">
+                {showBaby
+                  ? `${today.babies.map((x) => x.name).filter(Boolean).join(tx(' & ', ' na ')) || tx('Your baby', 'Mtoto wako')} · ${recoveryDayText(today.recovery.daysSinceBirth, lang)}`
+                  : recoveryDayText(today.recovery.daysSinceBirth, lang)}
+              </p>
+            </>
+          ) : (
+            <button type="button" id="today-label" className="today-label" onClick={() => nav('/record-birth')}>
+              {tx('Add your baby\'s birth date', 'Ongeza tarehe ya kuzaliwa kwa mtoto')}
+              <span className="today-label__chev" aria-hidden>
+                <IconChevron />
+              </span>
+            </button>
+          )
+        ) : preg ? (
+          <>
+            <button type="button" id="today-label" className="today-label" onClick={() => nav('/insights')} aria-label={tx(`${preg.weeks} weeks, ${preg.days} days. Open this week's insights`, `Wiki ${preg.weeks}, siku ${preg.days}. Fungua maelezo ya wiki hii`)}>
+              {tx(`${preg.weeks} weeks, ${preg.days} days`, `Wiki ${preg.weeks}, siku ${preg.days}`)}
+              <span className="today-label__chev" aria-hidden>
+                <IconChevron />
+              </span>
+            </button>
             <div
-              className="preg__bar"
+              className="preg__bar today-bar"
               role="progressbar"
               aria-valuemin={0}
               aria-valuemax={40}
@@ -350,101 +395,71 @@ export function HomePage() {
               aria-label={tx(`${preg.weeks} of 40 weeks`, `Wiki ${preg.weeks} kati ya 40`)}
             >
               <span style={{ width: `${Math.round(preg.fraction * 100)}%` }} />
-              <i style={{ left: '35%' }} aria-hidden />
-              <i style={{ left: '70%' }} aria-hidden />
             </div>
-            <p className="preg__due">
-              {tx('Estimated due date', 'Tarehe ya kujifungua (makadirio)')}: <strong>{fmtDate(preg.eddMs)}</strong>
-              {' · '}
-              {preg.daysToEdd > 0
-                ? tx(`${preg.daysToEdd} days to go`, `siku ${preg.daysToEdd} zimebaki`)
-                : preg.daysToEdd === 0
-                  ? tx('due today', 'ni leo')
-                  : tx(`${-preg.daysToEdd} days past due date`, `siku ${-preg.daysToEdd} baada ya tarehe`)}
+            <p className="today-sub">
+              {tx(`Trimester ${preg.trimester}`, `Kipindi ${preg.trimester}`)} · {tx('due', 'kujifungua')} {fmtDate(preg.eddMs)}
             </p>
-
-            {insight ? (
-              <div className="preg2__week">
-                <h2 className="preg2__h">{tx('This week and your pregnancy', 'Wiki hii na mimba yako')}</h2>
-                <div className="preg2__item">
-                  <h3>{tx('Your baby', 'Mtoto wako')}</h3>
-                  <p>
-                    <strong>{sw ? insight.sizeSw : insight.sizeEn}.</strong> {sw ? insight.babySw : insight.babyEn}
-                  </p>
-                </div>
-                <div className="preg2__item">
-                  <h3>{tx('What you may feel', 'Unachoweza kuhisi')}</h3>
-                  <p>{sw ? insight.feelSw : insight.feelEn}</p>
-                </div>
-                <div className="preg2__item">
-                  <h3>{tx('What to expect', 'Cha kutarajia')}</h3>
-                  <p>
-                    {anc
-                      ? anc.inWeeks === 0
-                        ? tx(`A clinic visit is recommended this week (visit ${anc.number} of 8).`, `Ziara ya kliniki inapendekezwa wiki hii (ziara ${anc.number} kati ya 8).`)
-                        : tx(
-                            `Next recommended clinic visit: around week ${anc.week} (visit ${anc.number} of 8). Your clinic gives your real date.`,
-                            `Ziara ijayo ya kliniki inayopendekezwa: karibu wiki ${anc.week} (ziara ${anc.number} kati ya 8). Kliniki yako hukupa tarehe halisi.`,
-                          )
-                      : tx('You are past 40 weeks. Stay in close touch with your clinic.', 'Umepita wiki 40. Wasiliana na kliniki yako kwa karibu.')}
-                  </p>
-                </div>
-                {insightOpen ? (
-                  <div className="preg2__item" id="insight-more">
-                    <h3>{tx('Good to do', 'Vizuri kufanya')}</h3>
-                    <p>{sw ? insight.doSw : insight.doEn}</p>
-                  </div>
-                ) : null}
-                <div className="preg2__watch">
-                  <h3>{tx('Get help straight away if', 'Tafuta msaada mara moja kama')}</h3>
-                  <p>{sw ? insight.watchSw : insight.watchEn}</p>
-                </div>
-                <div className="preg2__foot">
-                  <button type="button" className="btn btn-secondary btn-sm" aria-expanded={insightOpen} aria-controls="insight-more" onClick={() => setInsightOpen((v) => !v)}>
-                    {insightOpen ? tx('Show less', 'Onyesha kidogo') : tx('More guidance', 'Ushauri zaidi')}
-                  </button>
-                  <p className="insight__src">
-                    {tx('Adapted from the ', 'Imetoholewa kutoka ')}
-                    <a href={insight.sourceUrl} target="_blank" rel="noreferrer">
-                      {tx('NHS guide', 'mwongozo wa NHS')}
-                    </a>
-                    {tx(' and WHO ANC guidance', ' na mwongozo wa WHO')}
-                    {insight.status !== 'reviewed' ? <span className="insight__draft">{tx('Draft: awaiting nurse review', 'Rasimu: inasubiri muuguzi')}</span> : null}
-                  </p>
-                </div>
-                <div className={preg.weeks >= 36 ? 'preg2__arrived preg2__arrived--strong' : 'preg2__arrived'}>
-                  <span>{tx('Has your baby arrived?', 'Mtoto wako amefika?')}</span>
-                  <button type="button" className={preg.weeks >= 36 ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'} onClick={() => nav('/record-birth')}>
-                    {tx('Record the birth', 'Andika kujifungua')}
-                  </button>
-                </div>
-              </div>
-            ) : null}
-          </>
-        ) : today.stage === 'postpartum' ? (
-          <>
-            <p className="home-card__eyebrow" id="preg-title">
-              {tx('After birth', 'Baada ya kujifungua')}
-            </p>
-            <p className="preg__empty">{tx('Neema keeps watching your readings in the weeks after birth.', 'Neema anaendelea kuangalia vipimo vyako wiki baada ya kujifungua.')}</p>
           </>
         ) : (
-          <>
-            <p className="home-card__eyebrow" id="preg-title">
-              {tx('Your pregnancy', 'Mimba yako')}
-            </p>
-            <p className="preg__empty">{tx('Add your weeks or due date from the clinic card to see your progress.', 'Ongeza wiki au tarehe ya kujifungua kutoka kadi ya kliniki kuona maendeleo.')}</p>
-            <button type="button" className="btn btn-primary btn-sm" onClick={() => nav('/profile#pregnancy')}>
-              {tx('Add pregnancy details', 'Ongeza maelezo ya mimba')}
-            </button>
-          </>
+          <button type="button" id="today-label" className="today-label" onClick={() => nav('/profile#pregnancy')}>
+            {tx('Add your pregnancy weeks', 'Ongeza wiki za mimba')}
+            <span className="today-label__chev" aria-hidden>
+              <IconChevron />
+            </span>
+          </button>
         )}
+
+        <button type="button" className="btn btn-primary today-checkin" onClick={() => nav(postpartum ? '/recovery-check' : '/care')}>
+          {postpartum && today.recoveryCheckinToday ? tx('Check in again', 'Jibu tena') : tx('Start Daily Check-in', 'Anza Ukaguzi wa Leo')}
+        </button>
+        <p className="today-checkin__q">
+          {postpartum ? tx('How are you and your body feeling today?', 'Wewe na mwili wako mnajisikiaje leo?') : tx("How are you feeling today? Talk to Neema about how you're feeling.", 'Unajisikiaje leo? Ongea na Neema kuhusu unavyojisikia.')}
+        </p>
       </section>
 
-        </>
-      )}
+      {/* Quick actions */}
+      <nav className="today-actions" aria-label={tx('Quick actions', 'Vitendo vya haraka')}>
+        {(postpartum
+          ? [
+              [tx('Recovery', 'Kupona'), '/insights', <IconSpark key="i" />, true],
+              [tx('Symptoms', 'Dalili'), '/recovery-check', <IconPlus key="i" />, false],
+              [tx('Blood pressure', 'Shinikizo'), '/bp', <IconPressure key="i" />, false],
+              [tx('Sleep & mood', 'Usingizi'), '/wellbeing', <IconMoon key="i" />, false],
+            ]
+          : [
+              [tx('Baby growth', 'Ukuaji'), '/insights', <IconSpark key="i" />, true],
+              [tx('Symptoms', 'Dalili'), '/symptoms', <IconPlus key="i" />, false],
+              [tx('Blood pressure', 'Shinikizo'), '/bp', <IconPressure key="i" />, false],
+              [tx('Talk to Neema', 'Ongea'), '/care', <IconChat key="i" />, false],
+            ]
+        ).map(([label, to, icon, main]) => (
+          <button key={to as string} type="button" className="today-action" data-main={main as boolean} onClick={() => nav(to as string)}>
+            <span className="today-action__icon">{icon as React.ReactNode}</span>
+            <span className="today-action__label">{label as string}</span>
+          </button>
+        ))}
+      </nav>
 
-      {/* FOURTH: readings */}
+      {/* Daily insights */}
+      <section className="today-insights" aria-labelledby="insights-title">
+        <div className="today-insights__head">
+          <h2 id="insights-title">{tx('My daily insights', 'Maelezo yangu ya leo')}</h2>
+          <button type="button" className="n-link" onClick={() => nav('/insights')}>
+            {tx('See all', 'Ona yote')}
+          </button>
+        </div>
+        <div className="today-cards" role="list" ref={cardsRef}>
+          {cards.map((c) => (
+            <button key={c.id} type="button" role="listitem" className="today-card" data-tone={c.tone} onClick={() => nav(c.to)}>
+              <span className="today-card__kicker">{c.kicker}</span>
+              <strong className="today-card__title">{c.title}</strong>
+              <span className="today-card__text">{c.text}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* Readings */}
       <section className="home-card reads" aria-labelledby="reads-title" data-attention={anyAttention}>
         <div className="reads__head">
           <h2 id="reads-title">{tx('Your latest readings', 'Vipimo vyako vya karibuni')}</h2>
@@ -533,10 +548,51 @@ export function HomePage() {
         </p>
       </section>
 
-      {postpartum && today.delivery && showBaby ? <BabyFirstWeeksCard lang={lang} babies={today.babies} birthDateIso={today.delivery.dateIso} /> : null}
-
       <p className="trust-line">{t('saved_here')}</p>
     </main>
+  );
+}
+
+/** Seven days of the current week with today highlighted (like a pocket calendar). */
+function WeekStrip({ nowMs, lang }: { nowMs: number; lang: 'en' | 'sw' }) {
+  const today = new Date(nowMs);
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(today);
+  start.setDate(today.getDate() - today.getDay());
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    return d;
+  });
+  const loc = lang === 'sw' ? 'sw-KE' : 'en-KE';
+  return (
+    <ol className="week-strip" aria-label={lang === 'sw' ? 'Wiki hii' : 'This week'}>
+      {days.map((d) => {
+        const isToday = d.getTime() === today.getTime();
+        return (
+          <li key={d.getTime()} data-today={isToday} aria-current={isToday ? 'date' : undefined}>
+            <span className="week-strip__dow">{isToday ? (lang === 'sw' ? 'LEO' : 'TODAY') : d.toLocaleDateString(loc, { weekday: 'narrow' })}</span>
+            <span className="week-strip__num">{d.getDate()}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** Soft abstract art for when there is no baby picture to show. */
+function RecoveryArt({ label }: { label: string }) {
+  return (
+    <svg className="baby-art" viewBox="0 0 120 124" role="img" aria-label={label}>
+      <defs>
+        <radialGradient id="rec-glow" cx="50%" cy="45%" r="60%">
+          <stop offset="0%" stopColor="#fff6ef" />
+          <stop offset="100%" stopColor="#efc6b2" />
+        </radialGradient>
+      </defs>
+      <circle cx="60" cy="62" r="52" fill="url(#rec-glow)" />
+      <path d="M60 88 C 30 66, 38 40, 60 52 C 82 40, 90 66, 60 88 Z" fill="#f4a9a0" stroke="#e48b82" strokeWidth="2" />
+    </svg>
   );
 }
 

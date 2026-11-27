@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   isPlaceholderPhone,
@@ -15,19 +15,16 @@ import {
 } from '@neema/core';
 import { useGuardian } from '../hooks/useGuardian';
 import { useLocale } from '../hooks/useLocale';
-import { LangToggle } from '../ui/LangToggle';
 import { AllergyPicker, allergyLabel } from '../ui/AllergyPicker';
 import { RequiredMark } from '../ui/FormField';
 import { IconChevron } from '../ui/icons';
-import { EMPTY_BIRTH_PLAN, allergyAnswerOf, loadConsent, loadProfile, saveConsent, saveProfile, withAllergies, type MamaProfile } from '../services/passport';
+import { EMPTY_BIRTH_PLAN, allergyAnswerOf, loadConsent, loadProfile, saveProfile, withAllergies, type MamaProfile } from '../services/passport';
 import { listContacts } from '../services/contacts';
 import { listClinicalNotes, type ClinicalNoteRow } from '../services/clinicalNotes';
 import { progressFromProfile } from '../services/pregnancyProgress';
 import { deliveryMsOf, listBabies, recoveryProgressOf, setShowBabyInfo, undoDelivery } from '../services/delivery';
-import { lockSession } from '../services/auth';
 import { latestEpds } from '../services/epdsStore';
-import { db, type BabyRow, type ConsentRow } from '../storage/db';
-import { saveOnboarding } from '../hooks/useOnboarding';
+import type { BabyRow, ConsentRow } from '../storage/db';
 
 type Editing = null | 'personal' | 'pregnancy' | 'health' | 'provider';
 
@@ -50,17 +47,15 @@ export function ProfilePage() {
   const [profile, setProfile] = useState<MamaProfile | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [clinical, setClinical] = useState<ClinicalNoteRow[]>([]);
-  const [consent, setConsent] = useState<ConsentRow | null>(null);
+  const [, setConsent] = useState<ConsentRow | null>(null);
   const [epdsAt, setEpdsAt] = useState<number | null>(null);
   const [editing, setEditing] = useState<Editing>(null);
   const [form, setForm] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmUndo, setConfirmUndo] = useState(false);
   const [babies, setBabies] = useState<BabyRow[]>([]);
   const [allergyDraft, setAllergyDraft] = useState<AllergyAnswer>({ noneKnown: false, items: [] });
-  const taps = useRef<number[]>([]);
 
   async function reload() {
     const [p, c, n, cons, e] = await Promise.all([
@@ -198,40 +193,8 @@ export function ProfilePage() {
     await persist({ ...p, birthPlan: { ...plan, [key]: !plan[key] } }, 'plan');
   }
 
-  async function toggleShare(key: 'chp' | 'family' | 'nurse') {
-    if (!consent) return;
-    const sharing = { ...consent.sharing, [key]: !consent.sharing[key] };
-    if (!sharing.chp && !sharing.family) {
-      setSaved(null);
-      setFormError(tx('At least the CHP or family must be able to get alerts.', 'Angalau CHP au familia lazima wapate tahadhari.'));
-      return;
-    }
-    setFormError(null);
-    const row = await saveConsent({ version: consent.version, language: lang, agreedAtMs: Date.now(), sharing });
-    setConsent(row);
-  }
 
-  async function deleteEverything() {
-    await db.delete();
-    try {
-      localStorage.clear();
-      sessionStorage.clear();
-    } catch {
-      /* storage may be unavailable */
-    }
-    saveOnboarding({ orientationDone: false, consentDone: false });
-    window.location.assign('/start');
-  }
 
-  /** Hidden entry for the health team: tap the version line 5 times within 3 seconds. */
-  function versionTap() {
-    const now = Date.now();
-    taps.current = [...taps.current.filter((t) => now - t < 3000), now];
-    if (taps.current.length >= 5) {
-      taps.current = [];
-      nav('/team');
-    }
-  }
 
   const field = (key: string, label: string, extra: Partial<React.InputHTMLAttributes<HTMLInputElement>> = {}, required = false) => (
     <div className="field">
@@ -345,6 +308,9 @@ export function ProfilePage() {
 
   return (
     <main className="screen prof">
+      <button type="button" className="n-link prof-back" onClick={() => nav('/settings')}>
+        ‹ {tx('Settings', 'Mipangilio')}
+      </button>
       <header className="prof-id">
         <span className="prof-id__avatar" aria-hidden>
           {(p.displayName || 'M').charAt(0).toUpperCase()}
@@ -561,122 +527,8 @@ export function ProfilePage() {
             <Item k={tx('Birth place', 'Mahali pa kujifungua')} v={plan.facility ?? ''} />
           </dl>
         )}
-        <Row
-          label={tx('Show my summary to the nurse (QR)', 'Onyesha muhtasari kwa muuguzi (QR)')}
-          sub={tx('The nurse scans it at your visit. Nothing is sent over the internet.', 'Muuguzi anaskani kwenye ziara. Hakuna kinachotumwa mtandaoni.')}
-          onClick={() => nav('/summary')}
-        />
       </Section>
 
-      {/* Band */}
-      <Section id="band" title={tx('Your band', 'Bendi yako')}>
-        <p className="prof-contact">
-          <span className="prof-dot" data-on={g.connected} aria-hidden />
-          {g.connected
-            ? g.bandMode === 'simulator'
-              ? tx('Practice band connected', 'Bendi ya mazoezi imeunganishwa')
-              : tx('Band connected', 'Bendi imeunganishwa')
-            : tx('Not connected', 'Haijaunganishwa')}
-          {g.connected && g.sample?.batteryPct != null ? ` · ${tx('battery', 'betri')} ${g.sample.batteryPct}%` : ''}
-        </p>
-        <details className="prof-help">
-          <summary>{tx('Band not working?', 'Bendi haifanyi kazi?')}</summary>
-          <ul>
-            <li>{tx('Wear it snug on the wrist, above the wrist bone.', 'Ivae imebana kidogo juu ya kifundo cha mkono.')}</li>
-            <li>{tx('Keep the phone within a few metres, with Bluetooth on.', 'Weka simu karibu, Bluetooth ikiwa imewashwa.')}</li>
-            <li>{tx('Charge it if the battery is low.', 'Ichaji betri ikiwa chini.')}</li>
-            <li>{tx('If readings stop, Neema shows “waiting for signal”. Add a BP reading meanwhile.', 'Vipimo vikisimama, Neema anaonyesha “inasubiri ishara”. Ongeza shinikizo wakati huo.')}</li>
-          </ul>
-        </details>
-        <Row label={tx('Open band', 'Fungua bendi')} onClick={() => nav('/vitals')} />
-      </Section>
-
-      {/* Account */}
-      <Section id="account" title={tx('Account and privacy', 'Akaunti na faragha')}>
-        <div className="prof-line">
-          <span>{tx('Language', 'Lugha')}</span>
-          <LangToggle />
-        </div>
-        <Row label={tx('How Neema talks to me (text, voice, sign)', 'Neema anavyozungumza nami (maandishi, sauti, ishara)')} onClick={() => nav('/talk')} />
-        <Row label={tx('Change PIN', 'Badilisha PIN')} onClick={() => nav('/unlock?change=1')} />
-        <Row
-          label={tx('Lock Neema now', 'Funga Neema sasa')}
-          onClick={() => {
-            lockSession();
-            nav('/unlock');
-          }}
-        />
-        <div className="prof-line prof-line--muted">
-          <span>{tx('Reminders and notifications', 'Vikumbusho na arifa')}</span>
-          <span className="prof-tag">{tx('Not available yet', 'Bado haipatikani')}</span>
-        </div>
-
-        <h3 className="prof-h3">{tx('Who may get an alert', 'Nani apate tahadhari')}</h3>
-        {consent ? (
-          (
-            [
-              ['chp', tx('Community health promoter (CHP)', 'Mhudumu wa afya ya jamii (CHP)')],
-              ['family', tx('Family contact', 'Mwanafamilia')],
-              ['nurse', tx('Nurse at clinic visits', 'Muuguzi kliniki')],
-            ] as const
-          ).map(([key, label]) => (
-            <label key={key} className="row-divided">
-              <input type="checkbox" checked={consent.sharing[key]} onChange={() => void toggleShare(key)} />
-              <span>{label}</span>
-            </label>
-          ))
-        ) : (
-          <p className="prof-warn">{tx('No consent on file.', 'Hakuna idhini.')}</p>
-        )}
-        {formError && !editing ? (
-          <p className="field-error" role="alert">
-            {formError}
-          </p>
-        ) : null}
-        <p className="prof-sub">
-          {tx(
-            'Readings stay on this phone. An alert SMS goes only to the people ticked. Voice and chat questions are sent online to be answered.',
-            'Vipimo vinabaki kwenye simu hii. SMS ya tahadhari huenda kwa waliowekewa alama tu. Maswali ya sauti na gumzo hutumwa mtandaoni kujibiwa.',
-          )}
-        </p>
-
-        <p className="prof-sub">
-          {consent?.termsAcceptedAtMs
-            ? tx(`Terms accepted on ${d(consent.termsAcceptedAtMs)}.`, `Masharti yalikubaliwa ${d(consent.termsAcceptedAtMs)}.`)
-            : tx('Terms not yet accepted on this phone.', 'Masharti bado hayajakubaliwa kwenye simu hii.')}{' '}
-          <a className="n-link" href="/terms" onClick={(e) => { e.preventDefault(); nav('/terms'); }}>
-            {tx('Read the Terms and Conditions', 'Soma Masharti na Vigezo')}
-          </a>
-        </p>
-
-        {confirmDelete ? (
-          <div className="prof-danger" role="alertdialog" aria-labelledby="del-title">
-            <strong id="del-title">{tx('Delete everything on this phone?', 'Futa kila kitu kwenye simu hii?')}</strong>
-            <p>
-              {tx(
-                'Your profile, readings, alerts, contacts and notes will be removed. This cannot be undone.',
-                'Wasifu, vipimo, tahadhari, watu na maelezo vitafutwa. Haiwezi kurudishwa.',
-              )}
-            </p>
-            <div className="prof-edit-btns">
-              <button type="button" className="btn btn-ghost" onClick={() => setConfirmDelete(false)}>
-                {tx('Keep my data', 'Baki na data')}
-              </button>
-              <button type="button" className="btn btn-danger" onClick={() => void deleteEverything()}>
-                {tx('Delete', 'Futa')}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button type="button" className="prof-delete" onClick={() => setConfirmDelete(true)}>
-            {tx('Delete my data', 'Futa data yangu')}
-          </button>
-        )}
-      </Section>
-
-      <p className="prof-version" onClick={versionTap}>
-        Neema · {tx('decision support, not a diagnosis', 'msaada wa maamuzi, si utambuzi')} · v{import.meta.env.VITE_APP_VERSION ?? '0.3'}
-      </p>
     </main>
   );
 }

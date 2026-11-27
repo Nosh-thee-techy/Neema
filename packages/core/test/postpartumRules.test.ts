@@ -88,3 +88,20 @@ describe('recovery timeline', () => {
     expect(recoveryContentReviewed()).toBe(false);
   });
 });
+
+import { BABY_STAGES, babyStageFor } from '../src/babyDevelopment.js';
+
+describe('baby development', () => {
+  it('covers day 0 to 120 without gaps', () => {
+    for (let d = 0; d <= 120; d++) expect(BABY_STAGES.filter((s) => d >= s.fromDay && d <= s.toDay).length, `day ${d}`).toBe(1);
+    expect(babyStageFor(12).id).toBe('weeks_2_3');
+    expect(babyStageFor(300).id).toBe('months_2_3');
+  });
+  it('every stage has both languages, a source and stays draft', () => {
+    for (const s of BABY_STAGES) {
+      expect(s.sources.length).toBeGreaterThan(0);
+      expect(s.status).toBe('draft');
+      for (const t of [s.title, s.headline, ...s.doing, ...s.tips, ...s.askClinic]) expect(t.sw.length).toBeGreaterThan(3);
+    }
+  });
+});

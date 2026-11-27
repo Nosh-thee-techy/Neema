@@ -8,6 +8,8 @@ import { RegisterPage } from '../pages/RegisterPage';
 import { TermsPage } from '../pages/TermsPage';
 import { RecordBirthPage } from '../pages/RecordBirthPage';
 import { RecoveryCheckPage } from '../pages/RecoveryCheckPage';
+import { SettingsPage } from '../pages/SettingsPage';
+import { InsightsPage } from '../pages/InsightsPage';
 import { WellbeingPage } from '../pages/WellbeingPage';
 import { UnlockPage } from '../pages/UnlockPage';
 import { HomePage } from '../pages/HomePage';
@@ -122,7 +124,6 @@ export function AppRouter() {
                 </RequireAuth>
               }
             />
-            <Route path="/settings" element={<Navigate to="/profile" replace />} />
             <Route
               path="/chase"
               element={
@@ -208,6 +209,22 @@ export function AppRouter() {
               element={
                 <RequireAuth>
                   <WellbeingPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <RequireAuth>
+                  <SettingsPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/insights"
+              element={
+                <RequireAuth>
+                  <InsightsPage />
                 </RequireAuth>
               }
             />

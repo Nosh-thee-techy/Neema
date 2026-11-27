@@ -164,3 +164,60 @@ export function BabyStageArt({ week, days = 0, label }: { week: number; days?: n
     </svg>
   );
 }
+
+/**
+ * Original illustration of the newborn after birth: a swaddled baby that grows a little
+ * with age; eyes open from about 3 weeks and a first smile from about 5 weeks
+ * (matching the development guide). Illustrative only.
+ */
+export function NewbornArt({ ageDays, label }: { ageDays: number; label: string }) {
+  const t = Math.min(1, Math.max(0, ageDays / 90));
+  const scale = 0.82 + 0.18 * t;
+  const eyesOpen = ageDays >= 21;
+  const smiling = ageDays >= 35;
+  const skin = '#f0c2a4';
+  const edge = '#d79878';
+  return (
+    <svg className="baby-art baby-art--newborn" viewBox="0 0 120 124" role="img" aria-label={label}>
+      <defs>
+        <radialGradient id="nb-glow" cx="50%" cy="48%" r="60%">
+          <stop offset="0%" stopColor="#fff6ef" />
+          <stop offset="75%" stopColor="#f8dccd" />
+          <stop offset="100%" stopColor="#efc6b2" />
+        </radialGradient>
+        <linearGradient id="nb-blanket" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#c9d6ee" />
+          <stop offset="100%" stopColor="#9fb4d6" />
+        </linearGradient>
+      </defs>
+      <circle cx="60" cy="62" r="56" fill="url(#nb-glow)" />
+      <g transform={`translate(60 64) scale(${scale.toFixed(3)}) rotate(-18) translate(-60 -64)`} strokeLinecap="round" strokeLinejoin="round">
+        {/* Swaddle */}
+        <ellipse cx="66" cy="76" rx="26" ry="34" fill="url(#nb-blanket)" stroke="#8aa1c7" strokeWidth="1.5" />
+        <path d="M44 66 Q66 58 88 70" fill="none" stroke="#8aa1c7" strokeWidth="1.5" />
+        <path d="M46 84 Q66 76 86 90" fill="none" stroke="#8aa1c7" strokeWidth="1.2" opacity="0.7" />
+        {/* Head */}
+        <circle cx="60" cy="42" r="19" fill={skin} stroke={edge} strokeWidth="1.5" />
+        {/* Hat band */}
+        <path d="M41.5 38 Q60 20 78.5 38 Q60 30 41.5 38 Z" fill="#f4a9a0" />
+        {/* Cheeks */}
+        <circle cx="50" cy="48" r="3.2" fill="#f2a58f" opacity="0.5" />
+        <circle cx="70" cy="48" r="3.2" fill="#f2a58f" opacity="0.5" />
+        {/* Eyes */}
+        {eyesOpen ? (
+          <>
+            <circle cx="53" cy="42" r="2" fill="#5b3a2e" />
+            <circle cx="67" cy="42" r="2" fill="#5b3a2e" />
+          </>
+        ) : (
+          <>
+            <path d="M50 42 q3 2 6 0" fill="none" stroke="#9c6a55" strokeWidth="1.4" />
+            <path d="M64 42 q3 2 6 0" fill="none" stroke="#9c6a55" strokeWidth="1.4" />
+          </>
+        )}
+        {/* Mouth */}
+        {smiling ? <path d="M55 51 q5 4 10 0" fill="none" stroke="#9c6a55" strokeWidth="1.5" /> : <circle cx="60" cy="52" r="1.4" fill="#c98472" />}
+      </g>
+    </svg>
+  );
+}

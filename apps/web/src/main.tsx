@@ -15,6 +15,7 @@ import './styles/auth.css';
 import './styles/register.css';
 import './styles/home.css';
 import './styles/nav.css';
+import './styles/today.css';
 import './styles/system.css';
 
 createRoot(document.getElementById('root')!).render(

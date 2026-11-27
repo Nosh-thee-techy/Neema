@@ -122,9 +122,10 @@ with sync_playwright() as p:
     # ── P1 pregnancy → record the birth ─────────────────────────────────────
     fresh(page)
     register_pregnant(page)
-    check("P1 pregnant mother at 39 weeks is offered 'Record the birth'", page.get_by_role("button", name="Record the birth").count() == 1)
     before = profile(page)
-    page.get_by_role("button", name="Record the birth").click()
+    page.locator(".today-avatar").click()
+    page.wait_for_url("**/settings")
+    page.get_by_role("radio", name="Track after birth").click()
     page.wait_for_url("**/record-birth")
     page.get_by_role("button", name="Start my recovery care").click()
     check("P1 birth date and how the baby was born are required", page.locator("#birth-date-error").count() == 1 and page.locator("#birth-mode-error").count() == 1)
@@ -147,33 +148,38 @@ with sync_playwright() as p:
     babies = store(page, "babies")
     check("P1 baby kept as its own record", len(babies) == 1 and babies[0]["name"] == "Amani" and "name" not in json.dumps(after["delivery"]))
 
-    # ── P2 the recovery dashboard ──────────────────────────────────────────
+    # ── P2 the recovery dashboard (Today) ──────────────────────────────────
     page.screenshot(path=f"{SHOTS}/pp_home.png", full_page=True)
-    check("P2 greeting + days since birth + baby's age", "Wanjiru" in page.locator(".home2__hello").inner_text()
-          and "Day 12 of your recovery" in page.locator(".rec-welcome").inner_text() and "Amani: 12 days old" in page.locator(".rec-welcome").inner_text())
-    check("P2 reassuring recovery message", "12 days into your recovery" in page.locator(".rec-welcome__msg").inner_text())
+    check("P2 greeting + baby's age + day of recovery", "Wanjiru" in page.locator(".today-top__hello").inner_text()
+          and "12 days old" in page.locator(".today-label").inner_text() and "Amani" in page.locator(".today-sub").inner_text() and "Day 12 of your recovery" in page.locator(".today-sub").inner_text())
+    check("P2 floating newborn illustration", page.locator(".today-float svg.baby-art--newborn[role=img]").count() == 1)
     check("P2 bell and emergency hold still in the header", page.locator(".home2__bell").count() == 1 and page.get_by_test_id("sos-button").count() == 1)
-    tops = [page.locator(sel).first.bounding_box()["y"] for sel in [".rec-welcome", ".checkin2", ".rec-expect", ".reads", ".rec-baby"]]
-    check("P2 order: welcome → check-in → what to expect → readings → baby", tops == sorted(tops), str([round(t) for t in tops]))
-    check("P2 check-in asks about her body", "How are you and your body feeling today?" in page.locator(".checkin2").inner_text())
+    check("P2 check-in asks about her body", "How are you and your body feeling today?" in page.locator(".today-hero").inner_text())
+    labels = [t.strip() for t in page.locator(".today-action__label").all_inner_texts()]
+    check("P2 quick actions for recovery", labels == ["Recovery", "Symptoms", "Blood pressure", "Sleep & mood"], str(labels))
+    cards = page.locator(".today-card").all_inner_texts()
+    check("P2 insight cards: recovery stage, when to get help, normal, baby, next check", any("WEEK 2" in c.upper() for c in cards) and any("CALL 999" in c.upper() for c in cards)
+          and any("MAY BE NORMAL" in c.upper() for c in cards) and any("YOUR BABY" in c.upper() for c in cards) and any("DAY 7 AND DAY 14" in c.upper() for c in cards))
+    reads = page.locator(".reads").inner_text()
+    check("P2 readings: heart rate, BP, skin temperature (labelled), sleep", all(t in reads for t in ["Heart rate", "Blood pressure", "Skin temperature (band)", "Sleep last night"]))
+    check("P2 no made-up readings", page.locator(".read-row__value", has_text="—").count() == 4)
+    nav_labels = page.locator(".bottom-nav a").all_inner_texts()
+    check("P2 navigation: Today, Insights, CareChat, History, Sleep & mood", [n.strip() for n in nav_labels] == ["Today", "Insights", "CareChat", "History", "Sleep & mood"], str(nav_labels))
+    check("P2 no sideways scroll", no_overflow(page))
+
+    # Insights: full recovery guide + baby development
+    page.goto(f"{BASE}/insights"); page.wait_for_timeout(900)
     exp = page.locator(".rec-expect")
     check("P2 'Your Recovery: What to Expect' shows her stage (day 12 → Week 2)", "Your Recovery: What to Expect" in exp.inner_text() and "Week 2" in page.locator(".rec-stage-nav__mid").inner_text() and page.locator(".rec-now").count() == 1)
     check("P2 normal vs emergency vs today are separate", page.locator(".rec-normal li").count() >= 3 and page.locator(".rec-emergency li").count() >= 7 and page.locator(".rec-today li").count() >= 6)
-    check("P2 caesarean-specific advice is not shown when the stage has none, draft label shown", page.locator(".rec-expect .insight__draft").count() == 1)
-    check("P2 next WHO postnatal check shown", "day 7 and day 14" in exp.inner_text())
+    check("P2 draft label and next WHO postnatal check", page.locator(".rec-expect .insight__draft").count() == 1 and "day 7 and day 14" in exp.inner_text())
     page.get_by_role("button", name="Next stage").click()
     check("P2 can explore a later stage", "Weeks 3 and 4" in page.locator(".rec-stage-nav__mid").inner_text() and page.locator(".rec-now").count() == 0)
     page.get_by_role("button", name="Back to my stage").click()
     check("P2 'Back to my stage' returns", "Week 2" in page.locator(".rec-stage-nav__mid").inner_text())
-    reads = page.locator(".reads").inner_text()
-    check("P2 readings: heart rate, BP, skin temperature (labelled), sleep", all(t in reads for t in ["Heart rate", "Blood pressure", "Skin temperature (band)", "Sleep last night"]))
-    check("P2 no made-up readings", page.locator(".read-row__value", has_text="—").count() == 4)
-    check("P2 baby section is secondary and closed", page.locator(".rec-baby #rec-baby-body").count() == 0 and "Your Baby's First Weeks" in page.locator(".rec-baby").inner_text())
-    page.locator(".rec-baby").get_by_role("button", name="Open").click()
-    check("P2 baby section: newborn danger signs + next vaccine visit", page.locator(".rec-baby .rec-emergency li").count() >= 6 and "6 weeks" in page.locator(".rec-baby").inner_text())
-    nav_labels = page.locator(".bottom-nav a").all_inner_texts()
-    check("P2 navigation: Recovery, Sleep & mood, CareChat, History, Profile", [n.strip() for n in nav_labels] == ["Recovery", "Sleep & mood", "CareChat", "History", "Profile"], str(nav_labels))
-    check("P2 no sideways scroll", no_overflow(page))
+    page.get_by_role("tab", name="Your baby").click()
+    check("P2 baby development for her baby's age (weeks 2-3) with talk-to-clinic signs", "Weeks 2 and 3" in page.locator(".rec-stage-nav__mid").inner_text() and page.locator(".rec-today li").count() >= 1)
+    check("P2 newborn danger signs + next vaccine visit", page.locator(".rec-baby .rec-emergency li").count() >= 6 and "6 weeks" in page.locator(".rec-baby").inner_text())
 
     # ── P3 content follows the real birth date ─────────────────────────────
     for n, stage_title in [(1, "The first 24 hours"), (5, "Days 2 to 7"), (18, "Weeks 3 and 4"), (45, "Weeks 7 and 8")]:
@@ -182,11 +188,13 @@ with sync_playwright() as p:
         page.fill("#birth-date", days_ago(n))
         page.get_by_role("button", name="Save changes").click()
         page.wait_for_url("**/home")
-        page.wait_for_timeout(1000)
-        check(f"P3 day {n} shows '{stage_title}'", stage_title in page.locator(".rec-stage-nav__mid").inner_text())
-    check("P3 caesarean note appears where the stage has one", page.locator(".rec-cs").count() == 0)  # weeks 7-8 has none
+        page.goto(f"{BASE}/insights#recovery")
+        page.wait_for_timeout(900)
+        check(f"P3 day {n} shows '{stage_title}'", stage_title in page.locator(".rec-stage-nav__mid").first.inner_text())
+    check("P3 no caesarean note where the stage has none", page.locator(".rec-cs").count() == 0)
     page.goto(f"{BASE}/record-birth"); page.wait_for_timeout(600)
-    page.fill("#birth-date", days_ago(5)); page.get_by_role("button", name="Save changes").click(); page.wait_for_url("**/home"); page.wait_for_timeout(1000)
+    page.fill("#birth-date", days_ago(5)); page.get_by_role("button", name="Save changes").click(); page.wait_for_url("**/home")
+    page.goto(f"{BASE}/insights#recovery"); page.wait_for_timeout(900)
     check("P3 caesarean advice shown in days 2-7", page.locator(".rec-cs").count() == 1)
 
     # ── P4 calm daily check-in ─────────────────────────────────────────────
@@ -195,7 +203,7 @@ with sync_playwright() as p:
     rows = store(page, "recoveryCheckins")
     check("P4 check-in saved with day after birth", len(rows) == 1 and rows[0]["dayAfterBirth"] == 5 and rows[0]["dangerCodes"] == [])
     page.goto(f"{BASE}/home"); page.wait_for_timeout(1000)
-    check("P4 Home shows today's answers and 'Check in again'", page.get_by_role("button", name="Check in again").count() == 1 and "Sleep" in page.locator(".rec-summary").inner_text())
+    check("P4 Home shows 'Check in again'", page.get_by_role("button", name="Check in again").count() == 1)
     check("P4 sleep reading now filled from her answer", "5–6 h" in page.locator(".reads").inner_text())
 
     # ── P5 review-today sign (wound) ───────────────────────────────────────
@@ -240,20 +248,18 @@ with sync_playwright() as p:
     page.locator("#birth").get_by_text("Show baby care tips").click()
     page.wait_for_timeout(500)
     page.goto(f"{BASE}/home"); page.wait_for_timeout(1000)
-    check("P9 baby tips can be turned off", page.locator(".rec-baby").count() == 0 and "days old" not in page.locator(".rec-welcome").inner_text())
+    check("P9 baby tips can be turned off", page.locator(".today-card", has_text="Your baby").count() == 0 and page.locator(".baby-art--newborn").count() == 0)
     page.goto(f"{BASE}/summary"); page.wait_for_timeout(1000)
     check("P9 nurse summary still opens", page.locator("svg, canvas, img").count() > 0)
-    page.goto(f"{BASE}/profile#birth"); page.wait_for_timeout(900)
-    page.get_by_role("button", name="Recorded by mistake? Undo").click()
-    page.wait_for_timeout(300)
-    page.screenshot(path=f"{SHOTS}/pp_undo.png", full_page=True)
-    print("undo buttons:", page.locator(".prof-danger button").all_inner_texts())
-    page.locator(".prof-danger").get_by_role("button", name="Undo", exact=True).click()
+    page.goto(f"{BASE}/settings"); page.wait_for_timeout(900)
+    check("P9 Settings shows 'Track after birth' selected", page.get_by_role("radio", name="Track after birth").get_attribute("aria-checked") == "true")
+    page.get_by_role("radio", name="Track pregnancy").click()
+    page.locator(".prof-danger").get_by_role("button", name="Track pregnancy").click()
     page.wait_for_timeout(1000)
     p_after = profile(page)
     check("P9 undo returns to pregnancy with pregnancy data intact", p_after["stage"] == "pregnancy" and "delivery" not in p_after and p_after.get("gaWeeks") == 39)
     page.goto(f"{BASE}/home"); page.wait_for_timeout(1000)
-    check("P9 pregnancy dashboard back after undo", page.locator(".preg2 .preg__week").count() == 1 and [n.strip() for n in page.locator(".bottom-nav a").all_inner_texts()][0] == "Home")
+    check("P9 pregnancy dashboard back after undo", "weeks" in page.locator(".today-label").inner_text() and len(page.locator(".bottom-nav a").all_inner_texts()) == 4)
 
     # ── P10 registering after birth ───────────────────────────────────────
     fresh(page)
@@ -272,10 +278,10 @@ with sync_playwright() as p:
     page.locator("#reg-terms").check()
     nxt.click(); nxt.click()
     finish_pin(page)
-    check("P10 lands on the recovery dashboard at day 3", "Day 3 of your recovery" in page.locator(".rec-welcome").inner_text() and "Days 2 to 7" in page.locator(".rec-stage-nav__mid").inner_text())
+    check("P10 lands on the recovery dashboard at day 3", "Day 3 of your recovery" in page.locator(".today-sub").inner_text() and any("DAYS 2 TO 7" in c.upper() for c in page.locator(".today-card").all_inner_texts()))
 
     page.set_viewport_size({"width": 360, "height": 740})
-    for path in ["/home", "/recovery-check", "/wellbeing", "/record-birth"]:
+    for path in ["/home", "/insights", "/recovery-check", "/wellbeing", "/record-birth", "/settings"]:
         page.goto(f"{BASE}{path}"); page.wait_for_timeout(800)
         check(f"360px: {path} has no sideways scroll", no_overflow(page))
 

@@ -138,16 +138,25 @@ with sync_playwright() as p:
     check("J1 consent recorded", len(read_store(page, "consent")) == 1)
 
     # ── Journey 4: daily homepage (same install) ───────────────────────────
-    check("J4 pregnancy week + trimester shown", "Week 24" in page.locator(".preg__week").inner_text() and "Trimester 2" in page.locator(".preg__tri").inner_text())
-    check("J4 due date shown", "Estimated due date" in page.locator(".preg__due").inner_text())
-    tops = [page.locator(sel).first.bounding_box()["y"] for sel in [".home2__hello", ".checkin2", ".preg2", ".reads"]]
-    check("J4 order: greeting → check-in → pregnancy card → readings", tops == sorted(tops), str([round(t) for t in tops]))
-    check("J4 pregnancy + this week are ONE card", page.locator(".preg2 .preg2__week").count() == 1 and page.locator(".insight").count() == 0)
-    check("J4 baby illustration for the week", page.locator(".preg2 svg.baby-art[role=img]").count() == 1 and "24 weeks" in (page.locator(".baby-art").get_attribute("aria-label") or ""))
-    check("J4 next WHO clinic visit shown", "week 26" in page.locator(".preg2").inner_text())
-    page.get_by_role("button", name="More guidance").click()
-    check("J4 more guidance + source + draft label", page.locator("#insight-more").count() == 1 and page.locator(".insight__draft").count() == 1 and page.locator(".insight__src a").count() == 1)
+    check("J4 pregnancy week + trimester shown", "24 weeks" in page.locator(".today-label").inner_text() and "Trimester 2" in page.locator(".today-sub").inner_text())
+    check("J4 due date shown", "due" in page.locator(".today-sub").inner_text())
+    tops = [page.locator(sel).first.bounding_box()["y"] for sel in [".today-top", ".week-strip", ".today-hero", ".today-actions", ".today-insights", ".reads"]]
+    check("J4 order: header → week strip → baby → actions → insights → readings", tops == sorted(tops), str([round(t) for t in tops]))
+    check("J4 week strip highlights today", page.locator('.week-strip li[data-today="true"]').count() == 1)
+    check("J4 floating baby illustration for the week", page.locator(".today-float svg.baby-art[role=img]").count() == 1 and "24 weeks" in (page.locator(".today-float .baby-art").get_attribute("aria-label") or ""))
+    check("J4 '24 weeks, 3 days' label", "24 weeks, 3 days" in page.locator(".today-label").inner_text())
+    check("J4 no CHP / record-birth cards on Home", page.get_by_test_id("no-chp-warning").count() == 0 and page.get_by_role("button", name="Record the birth").count() == 0)
+    cards = page.locator(".today-card").all_inner_texts()
+    check("J4 daily insight cards: baby, feel, next WHO visit, danger signs", len(cards) >= 5 and any("week 26" in c for c in cards) and any("GET HELP" in c.upper() for c in cards))
     check("J4 readings link to history", page.get_by_role("link", name="View health history").count() == 1)
+    page.get_by_role("button", name="See all").click()
+    page.wait_for_url("**/insights")
+    page.wait_for_timeout(600)
+    check("J4 Insights page: this week + source + draft label", "Week 24" in page.locator(".rec-stage-nav__mid").inner_text() and page.locator(".insight__draft").count() == 1 and page.locator(".insight__src a").count() == 1)
+    page.get_by_role("button", name="Later weeks").click()
+    check("J4 Insights: explore later weeks", "Weeks 28" in page.locator(".rec-stage-nav__mid").inner_text())
+    page.goto(f"{BASE}/home")
+    page.wait_for_timeout(800)
     check("J4 three readings rows", page.locator(".read-row").count() == 3)
     check("J4 removed clutter (no KPI tiles, FAB, SOS card)", page.locator(".kpi-tile, .fab, .neema-fab, .sos-btn").count() == 0)
     check("J4 Home has no sideways scroll", no_overflow(page))
@@ -204,7 +213,7 @@ with sync_playwright() as p:
     page.wait_for_url("**/home")
 
     # ── Journey 7: PIN unlock ──────────────────────────────────────────────
-    page.goto(f"{BASE}/profile#account")
+    page.goto(f"{BASE}/settings")
     page.wait_for_timeout(800)
     page.get_by_role("button", name="Lock Neema now").click()
     page.wait_for_url("**/unlock")
@@ -227,7 +236,17 @@ with sync_playwright() as p:
     check("J7 paste of the right PIN unlocks", "/home" in page.url)
 
     # ── Journey 8: settings / profile ──────────────────────────────────────
-    page.locator(".bottom-nav a", has_text="Profile").click()
+    page.locator(".today-avatar").click()
+    page.wait_for_url("**/settings")
+    page.wait_for_timeout(600)
+    check("J8 Settings: avatar, View profile, only pregnancy / after-birth experiences",
+          page.get_by_role("button", name="View profile").count() == 1 and page.locator(".set-exp__card").count() == 2
+          and page.get_by_text("Track cycle").count() == 0 and page.get_by_role("radio", name="Track pregnancy").get_attribute("aria-checked") == "true")
+    check("J8 nurse QR, band, PIN, language, consent, delete all in Settings",
+          all(page.get_by_text(t, exact=False).count() > 0 for t in ["Show my summary to the nurse", "Your band", "Change PIN", "Language", "Who may get an alert", "Delete my data", "Terms accepted on"]))
+    check("J8 team tools not shown to the mother", page.get_by_text("Stage demo", exact=False).count() == 0 and page.get_by_text("Field readiness", exact=False).count() == 0)
+    check("J8 notifications honestly marked unavailable", page.get_by_text("Not available yet").count() == 1)
+    page.get_by_role("button", name="View profile").click()
     page.wait_for_url("**/profile")
     page.locator("#personal").get_by_role("button", name="Edit").click()
     page.fill("#pf-displayName", "Mama Wanjiru")
@@ -239,19 +258,18 @@ with sync_playwright() as p:
     page.wait_for_timeout(500)
     check("J8 personal details saved", profile(page)["displayName"] == "Mama Wanjiru" and profile(page)["phoneForAlerts"] == "+254712345999")
     check("J8 contacts shown with manage link", "Mama Otieno" in page.locator("#contacts").inner_text())
-    check("J8 nurse QR, band, PIN, language, consent, delete all present",
-          all(page.get_by_text(t, exact=False).count() > 0 for t in ["Show my summary to the nurse", "Your band", "Change PIN", "Language", "Who may get an alert", "Delete my data", "Terms accepted on"]))
-    check("J8 team tools not shown to the mother", page.get_by_text("Stage demo", exact=False).count() == 0 and page.get_by_text("Field readiness", exact=False).count() == 0)
-    check("J8 notifications honestly marked unavailable", page.get_by_text("Not available yet").count() == 1)
+    check("J8 Profile has patient details: personal, pregnancy, contacts, health", all(page.locator(f"#{i}").count() == 1 for i in ["personal", "pregnancy", "contacts", "health"]))
     check("J8 Profile has no sideways scroll", no_overflow(page))
     page.screenshot(path=f"{SHOTS}/j8_profile.png", full_page=True)
+    page.goto(f"{BASE}/settings")
+    page.wait_for_timeout(600)
     page.get_by_role("button", name="Show my summary to the nurse", exact=False).click()
     page.wait_for_url("**/summary")
     check("J8 nurse QR page opens", page.locator("svg, canvas, img").count() > 0)
     page.goto(f"{BASE}/home")
     page.wait_for_timeout(800)
     check("J8 new name on Home greeting", "Mama Wanjiru" in page.locator(".home2__hello").inner_text())
-    for old, new in [("/passport", "/profile"), ("/settings", "/profile"), ("/todo", "/home"), ("/consent", "/register")]:
+    for old, new in [("/passport", "/profile"), ("/todo", "/home"), ("/consent", "/register")]:
         page.goto(f"{BASE}{old}")
         page.wait_for_timeout(600)
         check(f"J8 old route {old} redirects", new in page.url or (old == "/consent" and "/home" in page.url), page.url)
@@ -295,7 +313,7 @@ with sync_playwright() as p:
     page.keyboard.press("ArrowLeft")
     check("Tabs: arrow keys move between tabs", page.get_by_role("tab", name="Alerts").get_attribute("aria-selected") == "true")
     small = []
-    for path in ["/home", "/history", "/profile"]:
+    for path in ["/home", "/history", "/profile", "/settings", "/insights"]:
         page.goto(f"{BASE}{path}")
         page.wait_for_timeout(700)
         small += page.evaluate("""() => [...document.querySelectorAll('main button, main a.btn')].filter(b => b.offsetParent && !b.closest('.pin-input') && !b.classList.contains('alg__remove'))
@@ -306,7 +324,7 @@ with sync_playwright() as p:
 
     # ── Small screen: no overflow on 360 px ────────────────────────────────
     page.set_viewport_size({"width": 360, "height": 740})
-    for path in ["/home", "/history", "/profile", "/care"]:
+    for path in ["/home", "/history", "/profile", "/care", "/settings", "/insights"]:
         page.goto(f"{BASE}{path}")
         page.wait_for_timeout(800)
         check(f"360px: {path} has no sideways scroll", no_overflow(page))

@@ -63,7 +63,12 @@ with sync_playwright() as p:
     page.wait_for_timeout(1500)
 
     # No CHP saved: home warns, and an alert falls back to "choose who to text"
-    check("Home warns when no CHP number is saved", page.get_by_test_id("no-chp-warning").count() == 1)
+    check("Home has no CHP card, but the avatar shows a dot", page.get_by_test_id("no-chp-warning").count() == 0 and page.locator(".today-avatar .icon-btn__dot").count() == 1)
+    page.goto(f"{BASE}/settings")
+    page.wait_for_timeout(900)
+    check("Settings warns when no CHP number is saved", page.get_by_test_id("no-chp-warning").count() == 1)
+    page.goto(f"{BASE}/home")
+    page.wait_for_timeout(900)
     play(page, "C · Dharura")
     page.wait_for_url("**/alert")
     page.wait_for_timeout(1500)
@@ -91,9 +96,11 @@ with sync_playwright() as p:
     add_contact("Otieno", "0110 222 333", "supervisor")
     listing = page.get_by_test_id("contact-list").inner_text()
     check("Numbers saved in +254 form", "+254712345678" in listing and "+254110222333" in listing, listing.replace("\n", " | ")[:200])
-    page.goto(f"{BASE}/home")
+    page.goto(f"{BASE}/settings")
     page.wait_for_timeout(1200)
-    check("Home warning gone once a CHP is saved", page.get_by_test_id("no-chp-warning").count() == 0)
+    check("Settings warning gone once a CHP is saved", page.get_by_test_id("no-chp-warning").count() == 0)
+    page.goto(f"{BASE}/home")
+    page.wait_for_timeout(1000)
 
     # Scenario C: emergency
     play(page, "C · Dharura")
@@ -135,7 +142,7 @@ with sync_playwright() as p:
     check("C ack does not re-raise a new alert", n_after == n_before, f"{n_before}->{n_after}")
     action = page.locator(".home-alert__action")
     check("C home after ack offers a next step, not a new alert",
-          page.locator(".home2").get_attribute("data-level") == "RED" and action.count() == 1 and "SMS" not in action.inner_text(),
+          page.locator(".today").get_attribute("data-level") == "RED" and action.count() == 1 and "SMS" not in action.inner_text(),
           action.inner_text() if action.count() else "none")
 
     # Scenario D: postpartum fever + fast pulse
@@ -153,12 +160,12 @@ with sync_playwright() as p:
     play(page, "A · Usiku mwema")
     page.wait_for_url("**/home")
     page.wait_for_timeout(1500)
-    lvl = page.locator(".home2").get_attribute("data-level")
+    lvl = page.locator(".today").get_attribute("data-level")
     check("A → GREEN", lvl == "GREEN", lvl)
     play(page, "B1 · Onyo")
     page.wait_for_url("**/home")
     page.wait_for_timeout(1500)
-    lvl = page.locator(".home2").get_attribute("data-level")
+    lvl = page.locator(".today").get_attribute("data-level")
     check("B1 → YELLOW", lvl == "YELLOW", lvl)
     page.goto(f"{BASE}/alert")
     page.wait_for_timeout(800)
@@ -167,7 +174,7 @@ with sync_playwright() as p:
     play(page, "B2 · Pima tena")
     page.wait_for_url("**/home")
     page.wait_for_timeout(1500)
-    lvl = page.locator(".home2").get_attribute("data-level")
+    lvl = page.locator(".today").get_attribute("data-level")
     check("B2 recheck → GREEN", lvl == "GREEN", lvl)
 
     # App SOS
@@ -194,7 +201,7 @@ with sync_playwright() as p:
     page.get_by_text("Niko njiani").click()
     page.wait_for_url("**/home")
     page.wait_for_timeout(6000)  # simulator SOS flag released after 3 s
-    lvl = page.locator(".home2").get_attribute("data-level")
+    lvl = page.locator(".today").get_attribute("data-level")
     check("After ack, RED clears (no SOS latch)", lvl != "RED", lvl)
     page.screenshot(path=f"{SHOTS}/home_after.png", full_page=True)
 

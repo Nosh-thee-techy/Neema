@@ -263,7 +263,7 @@ export function RecoveryExpectCard({ lang, days, mode }: { lang: Lang; days: num
         <p className="n-hint">{tx('If something on this list feels worse, or you are worried, ask anyway.', 'Kitu kwenye orodha hii kikizidi, au ukiwa na wasiwasi, uliza hata hivyo.')}</p>
       </div>
 
-      <div className="rec-help">
+      <div className="rec-help" id="help">
         <h3>{tx('When should I seek help?', 'Nitafute msaada lini?')}</h3>
         <div className="rec-emergency" role="group" aria-labelledby="rec-em-h">
           <h4 id="rec-em-h">{tx(`Emergency: go to a facility now or call ${EMERGENCY_NUMBER}`, `Dharura: nenda kituo cha afya sasa au piga ${EMERGENCY_NUMBER}`)}</h4>
@@ -310,9 +310,9 @@ export function RecoveryExpectCard({ lang, days, mode }: { lang: Lang; days: num
 
 // ── Baby: secondary ───────────────────────────────────────────────────────
 
-export function BabyFirstWeeksCard({ lang, babies, birthDateIso }: { lang: Lang; babies: BabyRow[]; birthDateIso: string }) {
+export function BabyFirstWeeksCard({ lang, babies, birthDateIso, defaultOpen = false }: { lang: Lang; babies: BabyRow[]; birthDateIso: string; defaultOpen?: boolean }) {
   const tx = makeTx(lang);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const birthMs = parseLocalIsoDate(birthDateIso) ?? Date.now();
   const ageDays = Math.max(0, Math.round((new Date().setHours(0, 0, 0, 0) - birthMs) / DAY));
   const visit = nextKepiVisit(ageDays);

@@ -11,6 +11,7 @@ import {
   pendingMessageKeys,
   weeklyInsightsReviewed,
   recoveryContentReviewed,
+  babyContentReviewed,
   type HardwareValidationReport,
   type MessageEntry,
   type SignedTriageConfig,
@@ -119,6 +120,7 @@ export async function getReadiness(): Promise<ReadinessReport> {
   if (contacts.placeholders.length) blockers.push('Some contacts still have placeholder numbers.');
   const weeklyContentReviewed = weeklyInsightsReviewed();
   if (!weeklyContentReviewed) blockers.push('Weekly pregnancy cards are drafts: need nurse/midwife review and Swahili check.');
+  if (!babyContentReviewed()) blockers.push('Baby development guide is a draft: needs child-health clinician review and Swahili check.');
   if (!recoveryContentReviewed()) blockers.push('After-birth recovery guide, newborn tips and danger-sign rules R15–R17 are drafts: need clinician sign-off and Swahili check.');
 
   return {

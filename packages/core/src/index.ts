@@ -238,3 +238,5 @@ export {
   type RecoveryStage,
   type RecoveryTopic,
 } from './recoveryTimeline.js';
+
+export { BABY_STAGES, babyContentReviewed, babyStageFor, type BabyStage } from './babyDevelopment.js';
