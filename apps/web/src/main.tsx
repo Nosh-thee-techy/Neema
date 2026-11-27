@@ -13,6 +13,8 @@ import './styles/care-chat.css';
 import './styles/todo.css';
 import './styles/auth.css';
 import './styles/register.css';
+import './styles/home.css';
+import './styles/nav.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

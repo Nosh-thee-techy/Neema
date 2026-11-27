@@ -1,5 +1,5 @@
 import { useEffect, useState, useTransition } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useGuardian } from '../hooks/useGuardian';
 import { useLocale } from '../hooks/useLocale';
 import { BrandMark } from '../ui/BrandMark';
@@ -10,6 +10,7 @@ import { LoadingScreen } from '../ui/LoadingScreen';
 import { ErrorScreen } from '../ui/ErrorScreen';
 import { getMessageTextFor, speakMessageKey } from '../services/speech';
 import { buildSmsLink } from '../services/alerts';
+import { EMERGENCY_NUMBER, EMERGENCY_TEL } from '../services/emergency';
 import { reasonPhrase, topReason } from '@neema/core';
 
 type AckKind = 'chp_replied' | 'mother_on_the_way';
@@ -18,6 +19,8 @@ type AckKind = 'chp_replied' | 'mother_on_the_way';
 export function AlertPage() {
   const g = useGuardian();
   const nav = useNavigate();
+  const [params] = useSearchParams();
+  const fromSos = params.get('sos') === '1';
   const { t, lang } = useLocale();
   const level = g.triage?.level ?? 'UNKNOWN';
   const sms = g.pendingSms;
@@ -58,6 +61,22 @@ export function AlertPage() {
     window.setTimeout(() => setOpenedFlash((id) => (id === contactId ? null : id)), 1800);
   }
 
+
+  const call999 = (
+    <div className="call-999" data-testid="call-999">
+      <a className="btn btn-danger call-999__btn" href={EMERGENCY_TEL}>
+        {lang === 'sw' ? `Piga ${EMERGENCY_NUMBER} sasa` : `Call ${EMERGENCY_NUMBER} now`}
+      </a>
+      {fromSos ? (
+        <p className="soft-note call-999__note">
+          {lang === 'sw'
+            ? `Simu yako inafungua ${EMERGENCY_NUMBER}. Bonyeza kitufe cha kijani kupiga. SMS kwa CHP zimeandaliwa hapa chini.`
+            : `Your phone is opening ${EMERGENCY_NUMBER}. Press the green call button. SMS to your CHP is ready below.`}
+        </p>
+      ) : null}
+    </div>
+  );
+
   if (g.error) {
     return (
       <ErrorScreen
@@ -66,6 +85,19 @@ export function AlertPage() {
         onRetry={() => g.clearError()}
         onHome={() => nav('/home')}
       />
+    );
+  }
+
+  // SOS just pressed: the alert is still being prepared. Never show "nothing now" here.
+  if (fromSos && !isRed) {
+    return (
+      <main className="screen alert-page" data-level="RED">
+        <BrandMark />
+        <h1 className="screen-title" style={{ textAlign: 'center' }}>
+          {lang === 'sw' ? 'Tunaomba msaada…' : 'Getting help…'}
+        </h1>
+        {call999}
+      </main>
     );
   }
 
@@ -102,6 +134,8 @@ export function AlertPage() {
           {lang === 'sw' ? 'Sababu' : 'Why'}: {why}
         </p>
       ) : null}
+
+      {isRed ? call999 : null}
 
       {isRed && g.redAcknowledged ? (
         <div className="panel alert-card alert-card--ok" role="status">

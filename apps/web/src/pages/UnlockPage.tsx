@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../ui/Button';
 import { BrandMark } from '../ui/BrandMark';
 import { LangToggle } from '../ui/LangToggle';
@@ -11,6 +11,8 @@ import { LoadingScreen } from '../ui/LoadingScreen';
 /** Local PIN — private on this phone. Set (with confirm) or unlock. */
 export function UnlockPage() {
   const nav = useNavigate();
+  const [params] = useSearchParams();
+  const changing = params.get('change') === '1';
   const { t, lang } = useLocale();
   const sw = lang === 'sw';
   const tx = (en: string, swText: string) => (sw ? swText : en);
@@ -56,8 +58,19 @@ export function UnlockPage() {
     }
     setBusy(true);
     try {
-      if (mode === 'confirm') await setPin(value);
-      else await unlockWithPin(value);
+      if (mode === 'confirm') {
+        await setPin(value);
+        nav(changing ? '/profile#account' : '/home', { replace: true });
+        return;
+      }
+      await unlockWithPin(value);
+      if (changing) {
+        // Current PIN is right: now choose the new one.
+        setMode('set');
+        setLength(4);
+        reset(null);
+        return;
+      }
       nav('/home', { replace: true });
     } catch {
       reset(mode === 'unlock' ? tx('That PIN is not right. Try again.', 'PIN si sahihi. Jaribu tena.') : tx('Could not save the PIN. Try again.', 'Imeshindwa kuhifadhi PIN. Jaribu tena.'));
@@ -72,7 +85,15 @@ export function UnlockPage() {
   const ready = pin.length >= (legacyUnlock ? 4 : length) && !busy;
 
   const title =
-    mode === 'set' ? tx('Set your PIN', 'Weka PIN yako') : mode === 'confirm' ? tx('Enter it again', 'Iandike tena') : tx('Welcome back', 'Karibu tena');
+    mode === 'set'
+      ? changing
+        ? tx('Choose a new PIN', 'Chagua PIN mpya')
+        : tx('Set your PIN', 'Weka PIN yako')
+      : mode === 'confirm'
+        ? tx('Enter it again', 'Iandike tena')
+        : changing
+          ? tx('Enter your current PIN', 'Ingiza PIN yako ya sasa')
+          : tx('Welcome back', 'Karibu tena');
   const sub =
     mode === 'set'
       ? tx(`Choose ${length} numbers you will remember. Your PIN keeps your information private on this phone.`, `Chagua namba ${length} utakazokumbuka. PIN inalinda taarifa zako kwenye simu hii.`)
@@ -153,6 +174,11 @@ export function UnlockPage() {
               }}
             >
               {length === 4 ? tx('Use 6 numbers instead', 'Tumia namba 6 badala yake') : tx('Use 4 numbers instead', 'Tumia namba 4 badala yake')}
+            </button>
+          ) : null}
+          {changing ? (
+            <button type="button" className="auth-card__switch" onClick={() => nav('/profile#account')}>
+              {tx('Cancel', 'Ghairi')}
             </button>
           ) : null}
           {mode === 'confirm' ? (

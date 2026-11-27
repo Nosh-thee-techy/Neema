@@ -11,10 +11,11 @@ import { VitalsPage } from '../pages/VitalsPage';
 import { BpPage } from '../pages/BpPage';
 import { SymptomsPage } from '../pages/SymptomsPage';
 import { AlertPage } from '../pages/AlertPage';
-import { PassportPage } from '../pages/PassportPage';
 import { SummaryPage } from '../pages/SummaryPage';
 import { ContactsPage } from '../pages/ContactsPage';
-import { SettingsPage } from '../pages/SettingsPage';
+import { TeamPage } from '../pages/TeamPage';
+import { HistoryPage } from '../pages/HistoryPage';
+import { ProfilePage } from '../pages/ProfilePage';
 import { ChasePage } from '../pages/ChasePage';
 import { CheckInPage } from '../pages/CheckInPage';
 import { EpdsPage } from '../pages/EpdsPage';
@@ -22,7 +23,6 @@ import { SignOffPage } from '../pages/SignOffPage';
 import { SignSessionPage } from '../pages/SignSessionPage';
 import { TalkModePage } from '../pages/TalkModePage';
 import { CareChatPage } from '../pages/CareChatPage';
-import { TodoPage } from '../pages/TodoPage';
 import { LocaleProvider } from '../hooks/useLocale';
 import { LandingPage } from '../pages/LandingPage';
 
@@ -59,14 +59,7 @@ export function AppRouter() {
                 </RequireAuth>
               }
             />
-            <Route
-              path="/todo"
-              element={
-                <RequireAuth>
-                  <TodoPage />
-                </RequireAuth>
-              }
-            />
+            <Route path="/todo" element={<Navigate to="/home" replace />} />
             <Route
               path="/home"
               element={
@@ -107,14 +100,7 @@ export function AppRouter() {
                 </RequireAuth>
               }
             />
-            <Route
-              path="/passport"
-              element={
-                <RequireAuth>
-                  <PassportPage />
-                </RequireAuth>
-              }
-            />
+            <Route path="/passport" element={<Navigate to="/profile" replace />} />
             <Route
               path="/summary"
               element={
@@ -131,14 +117,7 @@ export function AppRouter() {
                 </RequireAuth>
               }
             />
-            <Route
-              path="/settings"
-              element={
-                <RequireAuth>
-                  <SettingsPage />
-                </RequireAuth>
-              }
-            />
+            <Route path="/settings" element={<Navigate to="/profile" replace />} />
             <Route
               path="/chase"
               element={
@@ -176,6 +155,30 @@ export function AppRouter() {
               element={
                 <RequireAuth>
                   <SignSessionPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/history"
+              element={
+                <RequireAuth>
+                  <HistoryPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <RequireAuth>
+                  <ProfilePage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/team"
+              element={
+                <RequireAuth>
+                  <TeamPage />
                 </RequireAuth>
               }
             />

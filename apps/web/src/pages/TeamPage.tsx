@@ -2,18 +2,35 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BrandMark } from '../ui/BrandMark';
 import { Button } from '../ui/Button';
-import { LangToggle } from '../ui/LangToggle';
 import { getReadiness, type ReadinessReport } from '../services/readiness';
-import { lockSession } from '../services/auth';
+import { addClinicalNote } from '../services/clinicalNotes';
 import { useGuardian } from '../hooks/useGuardian';
 import { useLocale } from '../hooks/useLocale';
 
-/** Settings — language, people, band, quiet extras. */
-export function SettingsPage() {
+/**
+ * Health-team tools, hidden from mothers (reach via /team, or tap the version line
+ * on Profile five times). Readiness gates, stage demo, sign-off, chase list, nurse notes.
+ */
+export function TeamPage() {
   const nav = useNavigate();
   const g = useGuardian();
   const { t, lang } = useLocale();
   const [ready, setReady] = useState<ReadinessReport | null>(null);
+  const [noteAuthor, setNoteAuthor] = useState('');
+  const [noteRole, setNoteRole] = useState<'nurse' | 'chw'>('nurse');
+  const [noteFacility, setNoteFacility] = useState('');
+  const [noteText, setNoteText] = useState('');
+  const [noteMsg, setNoteMsg] = useState<string | null>(null);
+
+  async function saveNote() {
+    try {
+      await addClinicalNote({ authorRole: noteRole, authorName: noteAuthor, text: noteText, ...(noteFacility.trim() ? { facilityName: noteFacility } : {}) });
+      setNoteText('');
+      setNoteMsg(lang === 'sw' ? 'Imehifadhiwa. Mama anaweza kusoma lakini si kubadilisha.' : 'Saved. The mother can read it but not change it.');
+    } catch (e) {
+      setNoteMsg(e instanceof Error ? e.message : String(e));
+    }
+  }
 
   useEffect(() => {
     void getReadiness().then(setReady);
@@ -23,18 +40,11 @@ export function SettingsPage() {
     <main className="screen">
       <BrandMark />
       <h1 className="screen-title" style={{ marginTop: '1rem' }}>
-        {t('more')}
+        {lang === 'sw' ? 'Zana za timu ya afya' : 'Health team tools'}
       </h1>
       <p className="screen-sub">
-        {lang === 'sw' ? 'Lugha, watu, na bendi yako.' : 'Language, people, and your band.'}
+        {lang === 'sw' ? 'Si kwa mama. Hali ya uwanja, maonyesho, sahihi na maelezo ya muuguzi.' : 'Not for mothers. Field readiness, demo, sign-off and nurse notes.'}
       </p>
-
-      <div className="panel" style={{ marginBottom: '1rem' }}>
-        <strong>{t('language')}</strong>
-        <div style={{ marginTop: '0.65rem' }}>
-          <LangToggle />
-        </div>
-      </div>
 
       <div className="panel" style={{ marginBottom: '1rem' }}>
         <strong>{lang === 'sw' ? 'Hali ya uwanja' : 'Field readiness'}</strong>
@@ -44,9 +54,16 @@ export function SettingsPage() {
               ? 'Tayari kwa matumizi yanayosimamiwa'
               : 'Ready for supervised field use'
             : lang === 'sw'
-              ? 'Hali ya demo — milango bado wazi'
-              : 'Demo mode — gates still open'}
+              ? 'Hali ya demo: mambo haya bado yanahitajika'
+              : 'Demo mode: these are still needed'}
         </p>
+        {ready && ready.blockers.length ? (
+          <ul className="team-blockers" data-testid="readiness-blockers">
+            {ready.blockers.map((b) => (
+              <li key={b}>{b}</li>
+            ))}
+          </ul>
+        ) : null}
       </div>
 
       {ready && !ready.fieldReady ? (
@@ -92,60 +109,65 @@ export function SettingsPage() {
         </div>
       ) : null}
 
-      <div className="btn-row">
-        <Button variant="secondary" onClick={() => nav('/vitals')}>
-          {lang === 'sw' ? 'Bendi' : 'Band'}
+      <div className="panel" style={{ marginBottom: '1rem' }}>
+        <strong>{lang === 'sw' ? 'Ongeza maelezo ya kitabibu' : 'Add a clinical note'}</strong>
+        <p className="soft-note" style={{ margin: '0.35rem 0 0.7rem' }}>
+          {lang === 'sw'
+            ? 'Huonekana kwa mama kama "Maelezo ya muuguzi". Kwenye simu tu; haijathibitishwa na seva bado.'
+            : 'Shows to the mother as "Notes from your nurse". On this phone only; not server-verified yet.'}
+        </p>
+        <div className="field">
+          <label htmlFor="cn-author">{lang === 'sw' ? 'Jina lako' : 'Your name'}</label>
+          <input id="cn-author" value={noteAuthor} onChange={(e) => setNoteAuthor(e.target.value)} />
+        </div>
+        <div className="field">
+          <label htmlFor="cn-role">{lang === 'sw' ? 'Wewe ni' : 'Role'}</label>
+          <select id="cn-role" value={noteRole} onChange={(e) => setNoteRole(e.target.value as 'nurse' | 'chw')}>
+            <option value="nurse">{lang === 'sw' ? 'Muuguzi / mkunga' : 'Nurse / midwife'}</option>
+            <option value="chw">CHW / CHP</option>
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="cn-fac">{lang === 'sw' ? 'Kituo' : 'Facility'}</label>
+          <input id="cn-fac" value={noteFacility} onChange={(e) => setNoteFacility(e.target.value)} />
+        </div>
+        <div className="field">
+          <label htmlFor="cn-text">{lang === 'sw' ? 'Maelezo' : 'Note'}</label>
+          <textarea id="cn-text" rows={4} value={noteText} onChange={(e) => setNoteText(e.target.value)} />
+        </div>
+        <Button variant="secondary" style={{ width: '100%' }} disabled={!noteAuthor.trim() || !noteText.trim()} onClick={() => void saveNote()}>
+          {lang === 'sw' ? 'Hifadhi maelezo' : 'Save note'}
         </Button>
-        <Button variant="secondary" onClick={() => nav('/contacts')}>
-          {lang === 'sw' ? 'Wasiliana' : 'Contacts'}
-        </Button>
+        {noteMsg ? <p className="soft-note" role="status" style={{ marginTop: '0.5rem' }}>{noteMsg}</p> : null}
       </div>
-      <div className="btn-row" style={{ marginTop: '0.75rem' }}>
-        <Button variant="secondary" onClick={() => nav('/summary')}>
-          {lang === 'sw' ? 'Kwa muuguzi' : 'Nurse QR'}
-        </Button>
+
+      <div className="btn-row">
         <Button variant="secondary" onClick={() => nav('/chase')}>
           {lang === 'sw' ? 'Ufuatiliaji (CHP)' : 'Chase list (CHP)'}
         </Button>
-      </div>
-      <div className="btn-row" style={{ marginTop: '0.75rem' }}>
-        <Button variant="secondary" onClick={() => nav('/bp')}>
-          {t('add_bp')}
-        </Button>
-        <Button variant="secondary" onClick={() => nav('/check-in')}>
-          {lang === 'sw' ? 'Angalia leo' : 'Check-in'}
-        </Button>
-      </div>
-      <div className="btn-row" style={{ marginTop: '0.75rem' }}>
-        <Button variant="secondary" onClick={() => nav('/epds')}>
-          EPDS
-        </Button>
-        <Button variant="secondary" onClick={() => nav('/passport')}>
-          {t('passport')}
-        </Button>
-      </div>
-      <div className="btn-row" style={{ marginTop: '0.75rem' }}>
         <Button variant="secondary" onClick={() => nav('/sign-off')}>
           {lang === 'sw' ? 'Sahihi ya kliniki' : 'Clinical sign-off'}
         </Button>
+      </div>
+      <div className="btn-row" style={{ marginTop: '0.75rem' }}>
         <Button variant="secondary" onClick={() => nav('/sign')}>
-          {lang === 'sw' ? 'Ishara' : 'Sign talk'}
+          {lang === 'sw' ? 'Ishara (majaribio)' : 'Sign talk (lab)'}
+        </Button>
+        <Button variant="secondary" onClick={() => nav('/check-in')}>
+          {lang === 'sw' ? 'Ukaguzi wa CHP' : 'CHP check-in'}
         </Button>
       </div>
       <div className="btn-row" style={{ marginTop: '0.75rem' }}>
+        <Button variant="secondary" onClick={() => nav('/vitals')}>
+          {lang === 'sw' ? 'Bendi na QA' : 'Band and QA'}
+        </Button>
         <Button variant="secondary" onClick={() => nav('/orient')}>
           {lang === 'sw' ? 'Hadithi tena' : 'Replay story'}
         </Button>
-        <Button
-          variant="primary"
-          onClick={() => {
-            lockSession();
-            nav('/unlock');
-          }}
-        >
-          {lang === 'sw' ? 'Funga' : 'Lock'}
-        </Button>
       </div>
+      <Button variant="ghost" style={{ width: '100%', marginTop: '0.75rem' }} onClick={() => nav('/profile')}>
+        {lang === 'sw' ? 'Rudi kwa Wasifu' : 'Back to Profile'}
+      </Button>
       <p className="trust-line">{t('saved_here')}</p>
       <p style={{ marginTop: '1rem', fontSize: '0.8rem', color: 'var(--ink-muted)' }}>
         {lang === 'sw'

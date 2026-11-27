@@ -3,16 +3,22 @@
  */
 
 import { useEffect, useState } from 'react';
-import type { BpReading } from '@neema/core';
+import type { BpReading, PregnancyProgress, Stage } from '@neema/core';
 import { loadProfile } from '../services/passport';
 import { contactReadiness } from '../services/contacts';
+import { progressFromProfile } from '../services/pregnancyProgress';
 import { db } from '../storage/db';
 
 export interface TodaySnapshot {
   /** Name from the passport, or null when none is saved or it is locked. */
   name: string | null;
   gestationWeeks: number | null;
+  /** Live pregnancy progress from the clinic dating; null when unknown or after birth. */
+  pregnancy: PregnancyProgress | null;
+  stage: Stage | null;
   lastBp: BpReading | null;
+  /** Up to the last 7 real BP readings, oldest first (for the small trend line). */
+  recentBp: BpReading[];
   bpToday: boolean;
   lastSymptomTsMs: number | null;
   symptomsToday: boolean;
@@ -24,7 +30,10 @@ export interface TodaySnapshot {
 const EMPTY: TodaySnapshot = {
   name: null,
   gestationWeeks: null,
+  pregnancy: null,
+  stage: null,
   lastBp: null,
+  recentBp: [],
   bpToday: false,
   lastSymptomTsMs: null,
   symptomsToday: false,
@@ -49,18 +58,23 @@ export function useToday(refreshKey: unknown): TodaySnapshot {
     let cancelled = false;
     void (async () => {
       const dayStart = startOfLocalDay(Date.now());
-      const [profile, lastBp, lastSymptom, contacts] = await Promise.all([
+      const [profile, recentDesc, lastSymptom, contacts] = await Promise.all([
         loadProfile().catch(() => null),
-        db.bp.orderBy('tsMs').last(),
+        db.bp.orderBy('tsMs').reverse().limit(7).toArray(),
         db.symptoms.orderBy('tsMs').last(),
         contactReadiness(),
       ]);
       if (cancelled) return;
       const pregnant = profile?.stage === 'pregnancy';
+      const pregnancy = pregnant ? progressFromProfile(profile) : null;
+      const lastBp = recentDesc[0];
       setSnapshot({
         name: profile?.displayName?.trim() || null,
-        gestationWeeks: pregnant ? (profile?.gestationWeeks ?? null) : null,
+        gestationWeeks: pregnant ? (pregnancy?.weeks ?? profile?.gestationWeeks ?? null) : null,
+        pregnancy,
+        stage: profile?.stage ?? null,
         lastBp: lastBp ?? null,
+        recentBp: recentDesc.slice().reverse(),
         bpToday: Boolean(lastBp && lastBp.tsMs >= dayStart),
         lastSymptomTsMs: lastSymptom?.tsMs ?? null,
         symptomsToday: Boolean(lastSymptom && lastSymptom.tsMs >= dayStart),
