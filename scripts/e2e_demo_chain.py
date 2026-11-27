@@ -10,7 +10,7 @@ from playwright.sync_api import sync_playwright
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:5173"
 SHOTS = os.environ.get("NEEMA_E2E_SHOTS", "/tmp")
 INIT = """
-localStorage.setItem('neema.onboarding.v1', JSON.stringify({orientationDone:true, consentDone:true}));
+localStorage.setItem('neema.onboarding.v1', JSON.stringify({orientationDone:true, consentDone:true, registrationDone:true}));
 localStorage.setItem('neema.lang.v1', 'sw');
 window.__spoken = [];
 const realSpeak = window.speechSynthesis && window.speechSynthesis.speak.bind(window.speechSynthesis);
@@ -18,6 +18,8 @@ if (window.speechSynthesis) window.speechSynthesis.speak = (u) => { window.__spo
 document.addEventListener('click', (e) => {
   const a = e.target.closest && e.target.closest('a[href^="sms:"]');
   if (a) { e.preventDefault(); window.__sms = (window.__sms||[]).concat(a.getAttribute('href')); }
+  const t = e.target.closest && e.target.closest('a[href^="tel:"]');
+  if (t) { e.preventDefault(); window.__tel = (window.__tel||[]).concat(t.getAttribute('href')); }
 }, true);
 """
 
@@ -32,7 +34,7 @@ def level_on_alert(page):
     return page.locator('.status-orb').get_attribute('data-level')
 
 def play(page, label):
-    page.goto(f"{BASE}/settings")
+    page.goto(f"{BASE}/team")
     page.get_by_text(label, exact=False).first.click()
 
 results = []
@@ -131,9 +133,9 @@ with sync_playwright() as p:
     page.wait_for_timeout(4000)
     n_after = alerts_count(page)
     check("C ack does not re-raise a new alert", n_after == n_before, f"{n_before}->{n_after}")
-    action = page.locator(".hero-card__action")
+    action = page.locator(".home-alert__action")
     check("C home after ack offers a next step, not a new alert",
-          page.locator(".hero-card").get_attribute("data-level") == "RED" and action.count() == 1 and "SMS" not in action.inner_text(),
+          page.locator(".home2").get_attribute("data-level") == "RED" and action.count() == 1 and "SMS" not in action.inner_text(),
           action.inner_text() if action.count() else "none")
 
     # Scenario D: postpartum fever + fast pulse
@@ -151,12 +153,12 @@ with sync_playwright() as p:
     play(page, "A · Usiku mwema")
     page.wait_for_url("**/home")
     page.wait_for_timeout(1500)
-    lvl = page.locator(".hero-card").get_attribute("data-level")
+    lvl = page.locator(".home2").get_attribute("data-level")
     check("A → GREEN", lvl == "GREEN", lvl)
     play(page, "B1 · Onyo")
     page.wait_for_url("**/home")
     page.wait_for_timeout(1500)
-    lvl = page.locator(".hero-card").get_attribute("data-level")
+    lvl = page.locator(".home2").get_attribute("data-level")
     check("B1 → YELLOW", lvl == "YELLOW", lvl)
     page.goto(f"{BASE}/alert")
     page.wait_for_timeout(800)
@@ -165,11 +167,11 @@ with sync_playwright() as p:
     play(page, "B2 · Pima tena")
     page.wait_for_url("**/home")
     page.wait_for_timeout(1500)
-    lvl = page.locator(".hero-card").get_attribute("data-level")
+    lvl = page.locator(".home2").get_attribute("data-level")
     check("B2 recheck → GREEN", lvl == "GREEN", lvl)
 
     # App SOS
-    page.goto(f"{BASE}/settings")
+    page.goto(f"{BASE}/team")
     page.get_by_text("Anza upya").click()
     page.wait_for_timeout(1500)
     page.goto(f"{BASE}/home")
@@ -181,15 +183,18 @@ with sync_playwright() as p:
     page.wait_for_timeout(800)
     check("SOS short tap does nothing", "/home" in page.url)
     page.mouse.down(); page.wait_for_timeout(2400); page.mouse.up()
-    page.wait_for_url("**/alert", timeout=5000)
+    page.wait_for_url("**/alert*", timeout=5000)
     page.wait_for_timeout(1500)
     check("SOS hold → RED", level_on_alert(page) == "RED", level_on_alert(page))
+    tel = page.evaluate("window.__tel || []")
+    check("SOS hold opens the 999 dialer", "tel:999" in tel, str(tel))
+    check("Alert page offers Call 999", page.get_by_test_id("call-999").count() == 1)
     reason = page.get_by_test_id("alert-reason").inner_text()
     check("SOS reason", "SOS" in reason, reason)
     page.get_by_text("Niko njiani").click()
     page.wait_for_url("**/home")
     page.wait_for_timeout(6000)  # simulator SOS flag released after 3 s
-    lvl = page.locator(".hero-card").get_attribute("data-level")
+    lvl = page.locator(".home2").get_attribute("data-level")
     check("After ack, RED clears (no SOS latch)", lvl != "RED", lvl)
     page.screenshot(path=f"{SHOTS}/home_after.png", full_page=True)
 

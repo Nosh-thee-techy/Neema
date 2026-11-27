@@ -47,6 +47,10 @@ export interface MamaProfile {
   /** Clinic / provider info if known. */
   facilityName?: string;
   nurseName?: string;
+  /** 'basic' = feature phone only: reach her by voice call / SMS (needs the calls backend). */
+  phoneKind?: 'smartphone' | 'basic' | 'none';
+  /** She agreed to automated voice calls / SMS on phoneForAlerts. Calls need a server (see BACKEND_CONTRACT.md). */
+  automatedCallsConsent?: boolean;
   /** When the registration wizard finished. */
   registeredAtMs?: number;
 }

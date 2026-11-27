@@ -42,6 +42,8 @@ interface Draft {
   fullName: string;
   dateOfBirth: string;
   phone: string;
+  phoneKind: 'smartphone' | 'basic' | 'none';
+  callsConsent: boolean;
   location: string;
   stage: 'pregnancy' | 'postpartum';
   datingMode: 'weeks' | 'due' | 'unknown';
@@ -76,6 +78,8 @@ const EMPTY: Draft = {
   fullName: '',
   dateOfBirth: '',
   phone: '',
+  phoneKind: 'smartphone',
+  callsConsent: false,
   location: '',
   stage: 'pregnancy',
   datingMode: 'weeks',
@@ -220,6 +224,9 @@ export function RegisterPage() {
         const age = ageFrom(d.dateOfBirth, nowMs);
         if (age === null || age < 10 || age > 60) e.dateOfBirth = tx('Check the date of birth.', 'Angalia tarehe ya kuzaliwa.');
       }
+      if (d.phoneKind === 'basic' && !d.phone.trim()) {
+        e.phone = tx('Enter her phone number so the team can call her.', 'Andika namba yake ili timu impigie.');
+      }
       if (d.phone.trim()) {
         const n = normalizePhone(d.phone);
         if (!n || isPlaceholderPhone(n)) e.phone = tx('This does not look like a phone number. Example: 0712 345 678', 'Hii si namba sahihi. Mfano: 0712 345 678');
@@ -343,6 +350,10 @@ export function RegisterPage() {
       opt('dateOfBirth', d.dateOfBirth);
       opt('phoneForAlerts', d.phone.trim() ? normalizePhone(d.phone) ?? undefined : undefined);
       opt('location', d.location.trim());
+      if (d.role !== 'self') {
+        profile.phoneKind = d.phoneKind;
+        profile.automatedCallsConsent = d.phoneKind !== 'none' && d.callsConsent;
+      }
       opt('facilityName', d.facilityName.trim());
       opt('nurseName', d.role === 'nurse' ? d.registrarName.trim() : existing?.nurseName);
       opt('pastComplications', d.firstPregnancy === 'no' ? d.pastComplications : []);
@@ -536,14 +547,46 @@ export function RegisterPage() {
               </label>
               <input id="reg-phone" type="tel" inputMode="tel" value={d.phone} onChange={(e) => set('phone', e.target.value)} placeholder="0712 345 678" autoComplete="tel" {...aria('phone')} />
               {err('phone')}
-              {why('So your CHP can call you back after an alert.', 'Ili CHP wako akupigie baada ya tahadhari.')}
+              {self
+                ? why('So your CHP can call you back after an alert.', 'Ili CHP wako akupigie baada ya tahadhari.')
+                : why('So her CHP can call her back after an alert.', 'Ili CHP wake ampigie baada ya tahadhari.')}
             </div>
+            {!self && (
+              <>
+                <p className="reg-label">{tx('What phone does she have?', 'Ana simu ya aina gani?')}</p>
+                <div className="reg-seg reg-seg--3" role="radiogroup" aria-label={tx('Phone type', 'Aina ya simu')}>
+                  {(
+                    [
+                      ['smartphone', tx('Smartphone', 'Simu janja')],
+                      ['basic', tx('Basic phone', 'Simu ya kawaida')],
+                      ['none', tx('No phone', 'Hana simu')],
+                    ] as const
+                  ).map(([k, label]) => (
+                    <button key={k} type="button" role="radio" aria-checked={d.phoneKind === k} onClick={() => set('phoneKind', k)}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {d.phoneKind !== 'none' ? (
+                  <label className="reg-agree" style={{ marginTop: '0.6rem' }}>
+                    <input type="checkbox" checked={d.callsConsent} onChange={(e) => set('callsConsent', e.target.checked)} />
+                    <span>
+                      {tx('She agrees to receive automated check-in calls and SMS on this number.', 'Amekubali kupokea simu na SMS za ukaguzi za kiotomatiki kwa namba hii.')}
+                    </span>
+                  </label>
+                ) : null}
+                {why(
+                  'Automated calls are planned and need the Neema server. Saving this now means she is ready when it starts.',
+                  'Simu za kiotomatiki zinapangwa na zinahitaji seva ya Neema. Kuhifadhi sasa kunamtayarisha zitakapoanza.',
+                )}
+              </>
+            )}
             <div className="field">
               <label htmlFor="reg-loc">
                 {tx('Village / estate', 'Kijiji / mtaa')} {optional}
               </label>
               <input id="reg-loc" value={d.location} onChange={(e) => set('location', e.target.value)} autoComplete="address-level2" />
-              {why('Helps your CHP find you quickly.', 'Humsaidia CHP kukupata haraka.')}
+              {self ? why('Helps your CHP find you quickly.', 'Humsaidia CHP kukupata haraka.') : why('Helps the CHP find her quickly.', 'Humsaidia CHP kumpata haraka.')}
             </div>
           </>
         )}
@@ -801,6 +844,12 @@ export function RegisterPage() {
               <Row k={tx('Born', 'Alizaliwa')} v={d.dateOfBirth} />
               <Row k={tx('Phone', 'Simu')} v={d.phone ? normalizePhone(d.phone) ?? d.phone : ''} />
               <Row k={tx('Place', 'Mahali')} v={d.location} />
+              {!self ? (
+                <Row
+                  k={tx('Phone type', 'Aina ya simu')}
+                  v={`${d.phoneKind === 'basic' ? tx('Basic phone', 'Simu ya kawaida') : d.phoneKind === 'none' ? tx('No phone', 'Hana simu') : tx('Smartphone', 'Simu janja')}${d.callsConsent && d.phoneKind !== 'none' ? tx(' · automated calls OK', ' · simu za kiotomatiki sawa') : ''}`}
+                />
+              ) : null}
             </ReviewBlock>
             <ReviewBlock title={stepLabels.pregnancy} onEdit={() => goTo('pregnancy')} editLabel={tx('Edit', 'Badilisha')}>
               {d.stage === 'postpartum' ? (

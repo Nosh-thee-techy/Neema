@@ -195,7 +195,7 @@ export function HomePage() {
   const dateLine = new Date(nowMs).toLocaleDateString(sw ? 'sw-KE' : 'en-KE', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
-    <main className="screen screen--home home2">
+    <main className="screen screen--home home2" data-level={level}>
       {g.loading ? <LoadingScreen /> : null}
 
       <header className="home2__head">
