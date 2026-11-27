@@ -8,14 +8,18 @@ import {
   pregnancyProgress,
   toLocalIsoDate,
   eddFromGestationalAge,
+  isContradictory,
+  type AllergyAnswer,
   type BirthPlan,
   type Contact,
 } from '@neema/core';
 import { useGuardian } from '../hooks/useGuardian';
 import { useLocale } from '../hooks/useLocale';
 import { LangToggle } from '../ui/LangToggle';
+import { AllergyPicker, allergyLabel } from '../ui/AllergyPicker';
+import { RequiredMark } from '../ui/FormField';
 import { IconChevron } from '../ui/icons';
-import { EMPTY_BIRTH_PLAN, loadConsent, loadProfile, saveConsent, saveProfile, type MamaProfile } from '../services/passport';
+import { EMPTY_BIRTH_PLAN, allergyAnswerOf, loadConsent, loadProfile, saveConsent, saveProfile, withAllergies, type MamaProfile } from '../services/passport';
 import { listContacts } from '../services/contacts';
 import { listClinicalNotes, type ClinicalNoteRow } from '../services/clinicalNotes';
 import { progressFromProfile } from '../services/pregnancyProgress';
@@ -52,6 +56,7 @@ export function ProfilePage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [allergyDraft, setAllergyDraft] = useState<AllergyAnswer>({ noneKnown: false, items: [] });
   const taps = useRef<number[]>([]);
 
   async function reload() {
@@ -101,7 +106,8 @@ export function ProfilePage() {
         previous: p.previousPregnancies !== undefined ? String(p.previousPregnancies) : '',
       });
     if (section === 'health')
-      setForm({ conditions: list(p.conditions), allergies: list(p.allergies), medications: list(p.medications), notes: p.healthNotes ?? '' });
+      setForm({ conditions: list(p.conditions), medications: list(p.medications), notes: p.healthNotes ?? '' });
+    if (section === 'health') setAllergyDraft(allergyAnswerOf(p));
     if (section === 'provider') setForm({ facility: p.facilityName ?? '', nurse: p.nurseName ?? '', birthFacility: plan.facility ?? '' });
     setEditing(section);
   }
@@ -122,14 +128,14 @@ export function ProfilePage() {
       else next[k] = v as MamaProfile[K];
     };
     if (editing === 'personal') {
-      if (!f.displayName?.trim()) return setFormError(tx('Please enter a name.', 'Tafadhali andika jina.'));
+      if (!f.fullName?.trim() || f.fullName.trim().length < 2) return setFormError(tx('Enter your full name.', 'Andika jina lako kamili.'));
       if (f.phone?.trim()) {
         const n = normalizePhone(f.phone);
         if (!n || isPlaceholderPhone(n)) return setFormError(tx('Check the phone number.', 'Angalia namba ya simu.'));
         next.phoneForAlerts = n;
       } else delete next.phoneForAlerts;
-      next.displayName = f.displayName.trim();
-      opt('fullName', f.fullName?.trim());
+      next.fullName = f.fullName!.trim();
+      next.displayName = f.displayName?.trim() || next.fullName.split(/\s+/)[0]!;
       opt('dateOfBirth', f.dateOfBirth);
       opt('location', f.location?.trim());
     }
@@ -162,8 +168,13 @@ export function ProfilePage() {
       }
     }
     if (editing === 'health') {
+      if (isContradictory(allergyDraft)) return setFormError(tx('"No known allergies" cannot be picked with an allergy.', '"Hakuna mzio" haiwezi kuchaguliwa pamoja na mzio.'));
+      const withA = withAllergies(next, allergyDraft);
+      delete next.allergies;
+      delete next.allergyList;
+      delete next.noKnownAllergies;
+      Object.assign(next, withA);
       opt('conditions', split(f.conditions ?? ''));
-      opt('allergies', split(f.allergies ?? ''));
       opt('medications', split(f.medications ?? ''));
       opt('healthNotes', f.notes?.trim());
     }
@@ -215,9 +226,12 @@ export function ProfilePage() {
     }
   }
 
-  const field = (key: string, label: string, extra: Partial<React.InputHTMLAttributes<HTMLInputElement>> = {}) => (
+  const field = (key: string, label: string, extra: Partial<React.InputHTMLAttributes<HTMLInputElement>> = {}, required = false) => (
     <div className="field">
-      <label htmlFor={`pf-${key}`}>{label}</label>
+      <label htmlFor={`pf-${key}`}>
+        {label}
+        {required ? <RequiredMark /> : null}
+      </label>
       <input id={`pf-${key}`} value={form[key] ?? ''} onChange={(e) => setForm({ ...form, [key]: e.target.value })} {...extra} />
     </div>
   );
@@ -272,8 +286,8 @@ export function ProfilePage() {
       <Section id="personal" title={tx('Personal details', 'Maelezo binafsi')} onEdit={editing ? undefined : () => startEdit('personal')} editLabel={tx('Edit', 'Badilisha')}>
         {editing === 'personal' ? (
           <>
+            {field('fullName', tx('Full name', 'Jina kamili'), { autoComplete: 'name' }, true)}
             {field('displayName', tx('Name Neema uses', 'Jina Neema hutumia'))}
-            {field('fullName', tx('Full name', 'Jina kamili'))}
             {field('dateOfBirth', tx('Date of birth', 'Tarehe ya kuzaliwa'), { type: 'date', max: toLocalIsoDate(Date.now()) })}
             {field('phone', tx('Phone', 'Simu'), { type: 'tel', inputMode: 'tel', placeholder: '0712 345 678' })}
             {field('location', tx('Village / estate', 'Kijiji / mtaa'))}
@@ -366,7 +380,7 @@ export function ProfilePage() {
         {editing === 'health' ? (
           <>
             {field('conditions', tx('Conditions (commas)', 'Magonjwa (koma)'))}
-            {field('allergies', tx('Allergies', 'Mzio'))}
+            <AllergyPicker idPrefix="pf-alg" lang={lang} value={allergyDraft} onChange={setAllergyDraft} />
             {field('medications', tx('Medicines', 'Dawa'))}
             <div className="field">
               <label htmlFor="pf-notes">{tx('My notes', 'Maelezo yangu')}</label>
@@ -378,7 +392,13 @@ export function ProfilePage() {
           <dl className="prof-dl">
             <Item k={tx('Conditions', 'Magonjwa')} v={list(p.conditions)} />
             <Item k={tx('Past problems', 'Matatizo ya zamani')} v={list(p.pastComplications)} />
-            <Item k={tx('Allergies', 'Mzio')} v={list(p.allergies)} />
+            <Item
+              k={tx('Allergies', 'Mzio')}
+              v={(() => {
+                const a = allergyAnswerOf(p);
+                return a.noneKnown ? tx('No known allergies', 'Hakuna mzio unaojulikana') : a.items.map((e) => allergyLabel(e, lang)).join(' · ');
+              })()}
+            />
             <Item k={tx('Medicines', 'Dawa')} v={list(p.medications)} />
             <Item k={tx('My notes', 'Maelezo yangu')} v={p.healthNotes ?? ''} />
           </dl>
@@ -520,6 +540,15 @@ export function ProfilePage() {
           )}
         </p>
 
+        <p className="prof-sub">
+          {consent?.termsAcceptedAtMs
+            ? tx(`Terms accepted on ${d(consent.termsAcceptedAtMs)}.`, `Masharti yalikubaliwa ${d(consent.termsAcceptedAtMs)}.`)
+            : tx('Terms not yet accepted on this phone.', 'Masharti bado hayajakubaliwa kwenye simu hii.')}{' '}
+          <a className="n-link" href="/terms" onClick={(e) => { e.preventDefault(); nav('/terms'); }}>
+            {tx('Read the Terms and Conditions', 'Soma Masharti na Vigezo')}
+          </a>
+        </p>
+
         {confirmDelete ? (
           <div className="prof-danger" role="alertdialog" aria-labelledby="del-title">
             <strong id="del-title">{tx('Delete everything on this phone?', 'Futa kila kitu kwenye simu hii?')}</strong>
@@ -558,7 +587,7 @@ function Section({ id, title, onEdit, editLabel, children }: { id: string; title
       <div className="hist-head">
         <h2 id={`${id}-h`}>{title}</h2>
         {onEdit ? (
-          <button type="button" className="home-link" onClick={onEdit}>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={onEdit}>
             {editLabel}
           </button>
         ) : null}

@@ -190,3 +190,27 @@ export {
   weeklyInsightsReviewed,
   type WeeklyInsight,
 } from './weeklyInsights.js';
+
+export {
+  ALLERGY_CODES,
+  EMPTY_ALLERGIES,
+  allergiesFromLegacy,
+  cleanAllergyItems,
+  isContradictory,
+  setNoneKnown,
+  toggleAllergy,
+  type AllergyAnswer,
+  type AllergyCode,
+  type AllergyEntry,
+} from './allergies.js';
+
+export {
+  TERMS_VERSION,
+  validateRegistration,
+  type RegistrationError,
+  type RegistrationErrors,
+  type RegistrationField,
+  type RegistrationInput,
+} from './registration.js';
+
+export { WHO_ANC_CONTACT_WEEKS, nextAncContact, type AncContact } from './anc.js';

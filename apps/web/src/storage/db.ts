@@ -30,6 +30,9 @@ export interface ConsentRow {
   language: string;
   agreedAtMs: number;
   sharing: { chp: boolean; family: boolean; nurse: boolean };
+  /** Terms and Conditions version accepted at registration, and when. */
+  termsVersion?: string;
+  termsAcceptedAtMs?: number;
 }
 
 export interface BaselineRow {

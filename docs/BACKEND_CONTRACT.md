@@ -28,7 +28,20 @@ PATCH /api/mothers/:id           (staff or mother)  partial profile
 POST /api/mothers/:id/claim      (mother's phone) { otp sent by SMS }     → links the device to the record
 ```
 
-Consent text version (`consent-sw-v2`) and timestamp travel with the record.
+Consent text version (`consent-sw-v2`) and timestamp travel with the record, together with `termsVersion` and `termsAcceptedAtMs`.
+
+**Server-side validation:** `POST /api/mothers` must run the same rules as the app. They live in `@neema/core` `validateRegistration` (full name, gestational age or due date while pregnant, Terms accepted, valid phone numbers, a basic-phone mother needs a number, a health worker must give their name, no contradictory allergies). Reject with `422 { errors: { field: code } }` using the same field names and codes, so the app can show the same messages.
+
+**Profile fields added in this round** (all optional in storage, no breaking change):
+
+| Field | Type | Notes |
+|---|---|---|
+| `fullName` | string | required at registration |
+| `allergyList` | `Array<{code: AllergyCode} \| {code: 'other', name: string}>` | replaces comma `allergies: string[]` |
+| `noKnownAllergies` | boolean | never together with `allergyList` |
+| `phoneKind`, `automatedCallsConsent` | see §3 | |
+
+Consent record: `termsVersion` (string), `termsAcceptedAtMs` (number). A server table would store one allergy per row (`mother_id, code, other_name`).
 
 ## 3. Automated calls / SMS check-ins (feature-phone mothers)
 

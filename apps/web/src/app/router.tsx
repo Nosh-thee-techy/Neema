@@ -5,6 +5,7 @@ import { RequireAuth } from './RequireAuth';
 import { EntryPage } from '../pages/EntryPage';
 import { OrientationPage } from '../pages/OrientationPage';
 import { RegisterPage } from '../pages/RegisterPage';
+import { TermsPage } from '../pages/TermsPage';
 import { UnlockPage } from '../pages/UnlockPage';
 import { HomePage } from '../pages/HomePage';
 import { VitalsPage } from '../pages/VitalsPage';
@@ -41,6 +42,7 @@ export function AppRouter() {
             <Route path="/start" element={<EntryPage />} />
             <Route path="/orient" element={<OrientationPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/terms" element={<TermsPage />} />
             <Route path="/consent" element={<Navigate to="/register" replace />} />
             <Route path="/unlock" element={<UnlockPage />} />
             <Route

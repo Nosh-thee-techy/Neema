@@ -3,7 +3,7 @@
  * Sensitive fields are encrypted at rest when a PIN is provided.
  */
 
-import type { BirthPlan, Stage } from '@neema/core';
+import { allergiesFromLegacy, type AllergyAnswer, type AllergyEntry, type BirthPlan, type Stage } from '@neema/core';
 import { decryptString, deriveKeyFromPin, encryptString } from '../storage/crypto';
 import { db, type ConsentRow, type ProfileRow } from '../storage/db';
 
@@ -22,7 +22,12 @@ export interface MamaProfile {
   previousPregnancies?: number;
   pastComplications?: string[];
   medications?: string[];
+  /** @deprecated older comma-style list; read via `allergyAnswerOf`. */
   allergies?: string[];
+  /** One entry per allergy (structured). */
+  allergyList?: AllergyEntry[];
+  /** Explicit "no known allergies" (never combined with allergyList). */
+  noKnownAllergies?: boolean;
   discreetMode?: boolean;
   /** Birth preparedness checklist — not a risk score. */
   birthPlan?: BirthPlan;
@@ -146,4 +151,27 @@ export async function saveConsent(consent: Omit<ConsentRow, 'id'>): Promise<Cons
 
 export async function loadConsent(): Promise<ConsentRow | null> {
   return (await db.consent.get('latest')) ?? null;
+}
+
+/** Structured allergies for a profile, converting the older string list if needed. */
+export function allergyAnswerOf(p: Pick<MamaProfile, 'allergyList' | 'noKnownAllergies' | 'allergies'> | null | undefined): AllergyAnswer {
+  if (!p) return { noneKnown: false, items: [] };
+  if (p.noKnownAllergies) return { noneKnown: true, items: [] };
+  if (p.allergyList) return { noneKnown: false, items: p.allergyList };
+  return { noneKnown: false, items: allergiesFromLegacy(p.allergies) };
+}
+
+/** Writes structured allergies onto a profile and drops the old string list. */
+export function withAllergies(p: MamaProfile, a: AllergyAnswer): MamaProfile {
+  const next: MamaProfile = { ...p };
+  delete next.allergies;
+  if (a.noneKnown) {
+    next.noKnownAllergies = true;
+    delete next.allergyList;
+  } else {
+    delete next.noKnownAllergies;
+    if (a.items.length) next.allergyList = a.items;
+    else delete next.allergyList;
+  }
+  return next;
 }

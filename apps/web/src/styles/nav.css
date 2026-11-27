@@ -22,7 +22,7 @@
   overflow-x: clip;
 }
 
-.neema-shell--nav .care-chat__composer {
+.neema-shell--nav .care-chat__dock {
   position: sticky;
   bottom: calc(6rem + var(--safe-bottom));
   z-index: 5;
@@ -32,7 +32,7 @@
   .neema-shell--nav .care-chat {
     padding-bottom: 1rem;
   }
-  .neema-shell--nav .care-chat__composer {
+  .neema-shell--nav .care-chat__dock {
     bottom: 1rem;
   }
 }

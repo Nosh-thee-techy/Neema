@@ -52,6 +52,8 @@ def register(page, role="self", phone_kind=None, note=None, chp=True, weeks="24"
         page.fill("#reg-registrar", "Grace Achieng")
         page.fill("#reg-staffid", "CHW-0042" if role == "chw" else "NCK-1188")
     nxt.click()
+    nxt.click()  # empty → field errors
+    check(f"{role}: full name is required with a field message", page.locator("#reg-full-error").count() == 1 and page.locator("#reg-full").get_attribute("aria-invalid") == "true")
     page.fill("#reg-display", "Wanjiru")
     page.fill("#reg-full", "Wanjiru Kamau")
     page.fill("#reg-dob", "1998-04-12")
@@ -61,6 +63,8 @@ def register(page, role="self", phone_kind=None, note=None, chp=True, weeks="24"
         page.get_by_role("radio", name={"basic": "Basic phone", "none": "No phone", "smartphone": "Smartphone"}[phone_kind]).click()
         page.locator(".reg-agree input").check()
     nxt.click()
+    nxt.click()  # empty pregnancy step → errors
+    check(f"{role}: gestational age is required", page.locator("#reg-gaw-error").count() == 1)
     page.fill("#reg-gaw", weeks)
     page.select_option("#reg-gad", days)
     page.get_by_role("radio", name="No", exact=True).click()
@@ -68,7 +72,19 @@ def register(page, role="self", phone_kind=None, note=None, chp=True, weeks="24"
     page.get_by_role("button", name="Caesarean (operation) birth").click()
     nxt.click()
     page.get_by_role("button", name="High blood pressure", exact=True).click()
-    page.fill("#reg-allergy", "penicillin")
+    # Allergies: pick, then try "none" (clears), then pick again + add "other"
+    page.get_by_role("button", name="Latex (rubber gloves)").click()
+    page.get_by_role("button", name="No known allergies").click()
+    contradiction_ok = page.get_by_role("button", name="Latex (rubber gloves)").is_disabled() and \
+        page.get_by_role("button", name="Latex (rubber gloves)").get_attribute("aria-pressed") == "false"
+    page.get_by_role("button", name="No known allergies").click()
+    page.get_by_role("button", name="Penicillin (amoxicillin)").click()
+    page.fill("#reg-alg-other", "Mango")
+    page.get_by_role("button", name="Add", exact=True).click()
+    page.fill("#reg-alg-other", "Pollen")
+    page.keyboard.press("Enter")
+    page.get_by_role("button", name="Remove Pollen").click()
+    check(f"{role}: 'No known allergies' clears and blocks other picks", contradiction_ok)
     page.fill("#reg-meds", "iron, folic acid")
     page.fill("#reg-notes", "I get headaches in the evening.")
     nxt.click()
@@ -81,7 +97,9 @@ def register(page, role="self", phone_kind=None, note=None, chp=True, weeks="24"
     if role == "nurse":
         page.fill("#reg-clin", note or "BP 128/82 at booking. Hb 11.2. Next ANC in 4 weeks.")
         nxt.click()
-    page.locator(".reg-agree input").last.check()
+    nxt.click()  # try without accepting the terms
+    check(f"{role}: Terms are not pre-ticked and are required", not page.locator("#reg-terms").is_checked() and page.locator("#reg-terms-error").count() == 1)
+    page.locator("#reg-terms").check()
     nxt.click()  # → review
     page.screenshot(path=f"{SHOTS}/j_{role}_review.png", full_page=True)
     nxt.click()  # finish
@@ -106,32 +124,38 @@ with sync_playwright() as p:
     fresh(page)
     page.locator(".btn-ghost").first.click()
     page.wait_for_url("**/register")
-    page.locator(".reg-actions .btn-primary").click()  # who = self
-    page.locator(".reg-actions .btn-primary").click()  # about, empty name
-    check("J1 validation: empty name is blocked with a message", page.locator("#err-displayName").count() == 1)
     page.goto(f"{BASE}/start")
     fresh(page)
     register(page, "self")
     prof = profile(page)
     check("J1 reaches personalised Home", "/home" in page.url and "Wanjiru" in page.locator(".home2__hello").inner_text())
     check("J1 pregnancy saved with recorded date", prof and prof.get("gaWeeks") == 24 and prof.get("gaDays") == 3 and prof.get("gaRecordedOnMs"))
-    check("J1 history saved", prof and prof.get("pastComplications") == ["caesarean"] and prof.get("conditions") == ["high_bp"] and prof.get("allergies") == ["penicillin"])
+    check("J1 history saved", prof and prof.get("pastComplications") == ["caesarean"] and prof.get("conditions") == ["high_bp"])
+    check("J1 allergies stored one by one (no comma string)", prof.get("allergyList") == [{"code": "penicillin"}, {"code": "other", "name": "Mango"}] and "allergies" not in prof and "noKnownAllergies" not in prof, str(prof.get("allergyList")))
+    cons = read_store(page, "consent")[0]
+    check("J1 terms acceptance recorded with version and time", cons.get("termsVersion", "").startswith("neema-terms") and cons.get("termsAcceptedAtMs"))
     check("J1 contacts saved as +254", sorted(c["phone"] for c in read_store(page, "contacts")) == ["+254722111234", "+254733987654"])
     check("J1 consent recorded", len(read_store(page, "consent")) == 1)
 
     # ── Journey 4: daily homepage (same install) ───────────────────────────
     check("J4 pregnancy week + trimester shown", "Week 24" in page.locator(".preg__week").inner_text() and "Trimester 2" in page.locator(".preg__tri").inner_text())
-    check("J4 due date shown", "Due around" in page.locator(".preg__due").inner_text())
-    check("J4 this-week card shown", page.locator(".insight").count() == 1)
-    page.get_by_role("button", name="Read more").click()
-    check("J4 read more shows source + draft label", page.locator(".insight__draft").count() == 1 and page.locator(".insight__src a").count() == 1)
+    check("J4 due date shown", "Estimated due date" in page.locator(".preg__due").inner_text())
+    tops = [page.locator(sel).first.bounding_box()["y"] for sel in [".home2__hello", ".checkin2", ".preg2", ".reads"]]
+    check("J4 order: greeting → check-in → pregnancy card → readings", tops == sorted(tops), str([round(t) for t in tops]))
+    check("J4 pregnancy + this week are ONE card", page.locator(".preg2 .preg2__week").count() == 1 and page.locator(".insight").count() == 0)
+    check("J4 baby illustration for the week", page.locator(".preg2 svg.baby-art[role=img]").count() == 1 and "24 weeks" in (page.locator(".baby-art").get_attribute("aria-label") or ""))
+    check("J4 next WHO clinic visit shown", "week 26" in page.locator(".preg2").inner_text())
+    page.get_by_role("button", name="More guidance").click()
+    check("J4 more guidance + source + draft label", page.locator("#insight-more").count() == 1 and page.locator(".insight__draft").count() == 1 and page.locator(".insight__src a").count() == 1)
+    check("J4 readings link to history", page.get_by_role("link", name="View health history").count() == 1)
     check("J4 three readings rows", page.locator(".read-row").count() == 3)
     check("J4 removed clutter (no KPI tiles, FAB, SOS card)", page.locator(".kpi-tile, .fab, .neema-fab, .sos-btn").count() == 0)
     check("J4 Home has no sideways scroll", no_overflow(page))
     page.screenshot(path=f"{SHOTS}/j4_home.png", full_page=True)
-    page.get_by_role("button", name="Talk to Neema").click()
+    page.get_by_role("button", name="Start Daily Check-in").click()
     page.wait_for_url("**/care")
     check("J4 daily check-in opens CareChat", "/care" in page.url)
+    page.wait_for_timeout(900)  # let the page's rise-in animation finish before measuring
     send = page.locator(".care-chat__composer").first
     nav_box = page.locator(".bottom-nav").bounding_box()
     comp_box = send.bounding_box()
@@ -152,9 +176,9 @@ with sync_playwright() as p:
     page.wait_for_url("**/history")
     page.wait_for_timeout(800)
     page.screenshot(path=f"{SHOTS}/j5_history.png", full_page=True)
-    check("J5 History lists the reading", "150/96" in page.locator("#panel-readings").inner_text(), page.locator("#panel-readings").inner_text()[:120].replace("\n", " | "))
+    check("J5 History lists the reading", "150/96" in page.locator("#hist-panel-readings").inner_text(), page.locator("#hist-panel-readings").inner_text()[:120].replace("\n", " | "))
     page.get_by_role("tab", name="Alerts").click()
-    check("J5 History alerts tab", page.locator("#panel-alerts").count() == 1)
+    check("J5 History alerts tab", page.locator("#hist-panel-alerts").count() == 1)
     check("J5 History has no sideways scroll", no_overflow(page))
 
     # ── Journey 6: emergency ───────────────────────────────────────────────
@@ -216,7 +240,7 @@ with sync_playwright() as p:
     check("J8 personal details saved", profile(page)["displayName"] == "Mama Wanjiru" and profile(page)["phoneForAlerts"] == "+254712345999")
     check("J8 contacts shown with manage link", "Mama Otieno" in page.locator("#contacts").inner_text())
     check("J8 nurse QR, band, PIN, language, consent, delete all present",
-          all(page.get_by_text(t, exact=False).count() > 0 for t in ["Show my summary to the nurse", "Your band", "Change PIN", "Language", "Who may get an alert", "Delete my data"]))
+          all(page.get_by_text(t, exact=False).count() > 0 for t in ["Show my summary to the nurse", "Your band", "Change PIN", "Language", "Who may get an alert", "Delete my data", "Terms accepted on"]))
     check("J8 team tools not shown to the mother", page.get_by_text("Stage demo", exact=False).count() == 0 and page.get_by_text("Field readiness", exact=False).count() == 0)
     check("J8 notifications honestly marked unavailable", page.get_by_text("Not available yet").count() == 1)
     check("J8 Profile has no sideways scroll", no_overflow(page))
@@ -238,7 +262,7 @@ with sync_playwright() as p:
     page.wait_for_url("**/register")
     page.locator(".reg-choice").nth(1).click()
     page.locator(".reg-actions .btn-primary").click()
-    check("J2 CHW must give their own name", page.locator("#err-registrarName").count() == 1)
+    check("J2 CHW must give their own name", page.locator("#reg-registrar-error").count() == 1)
     fresh(page)
     register(page, "chw", phone_kind="basic")
     prof = profile(page)
@@ -254,10 +278,31 @@ with sync_playwright() as p:
     check("J3 mother's own notes unchanged", prof.get("healthNotes") == "I get headaches in the evening." and "Hb" not in json.dumps(prof))
     page.goto(f"{BASE}/history#notes")
     page.wait_for_timeout(800)
-    panel = page.locator("#panel-notes")
+    panel = page.locator("#hist-panel-notes")
     check("J3 History shows both kinds of notes", "Booking visit" in panel.inner_text() and "headaches" in panel.inner_text())
     nurse_card = panel.locator(".home-card").nth(1)
     check("J3 nurse notes are read-only for her", nurse_card.locator("button, textarea, input").count() == 0)
+
+    # ── Design system: tabs and buttons ───────────────────────────────────
+    page.goto(f"{BASE}/history")
+    page.wait_for_timeout(800)
+    tab = page.get_by_role("tab", name="Readings")
+    other = page.get_by_role("tab", name="Visits")
+    bg_sel = tab.evaluate("e => getComputedStyle(e).backgroundColor")
+    bg_other = other.evaluate("e => getComputedStyle(e).backgroundColor")
+    check("Tabs: selected tab has its own colour", tab.get_attribute("aria-selected") == "true" and bg_sel != bg_other, f"{bg_sel} vs {bg_other}")
+    other.focus()
+    page.keyboard.press("ArrowLeft")
+    check("Tabs: arrow keys move between tabs", page.get_by_role("tab", name="Alerts").get_attribute("aria-selected") == "true")
+    small = []
+    for path in ["/home", "/history", "/profile"]:
+        page.goto(f"{BASE}{path}")
+        page.wait_for_timeout(700)
+        small += page.evaluate("""() => [...document.querySelectorAll('main button, main a.btn')].filter(b => b.offsetParent && !b.closest('.pin-input') && !b.classList.contains('alg__remove'))
+          .map(b => ({h: b.getBoundingClientRect().height, t: (b.innerText || b.getAttribute('aria-label') || '').slice(0, 24)})).filter(x => x.h < 40)""")
+    check("Buttons: every button is at least 40px tall", not small, str(small[:5]))
+    ghost_bg = page.evaluate("() => { const b = document.querySelector('.btn-ghost, .btn-secondary'); return b ? getComputedStyle(b).backgroundColor + '|' + getComputedStyle(b).borderTopWidth : '' }")
+    check("Buttons: secondary buttons have a background or border", ghost_bg and not ghost_bg.startswith("rgba(0, 0, 0, 0)|0px"), ghost_bg)
 
     # ── Small screen: no overflow on 360 px ────────────────────────────────
     page.set_viewport_size({"width": 360, "height": 740})

@@ -7,6 +7,7 @@ import { useVitalsTrend } from '../hooks/useVitalsTrend';
 import { TonightCard, TrendCard } from '../ui/VitalsDashboard';
 import { db, type VisitRecord } from '../storage/db';
 import { listVisits, newVisit, saveVisit } from '../services/visits';
+import { Segmented } from '../ui/Segmented';
 import { listClinicalNotes, type ClinicalNoteRow } from '../services/clinicalNotes';
 import { loadProfile } from '../services/passport';
 
@@ -99,32 +100,28 @@ export function HistoryPage() {
       <h1 className="screen-title">{tx('Health history', 'Historia ya afya')}</h1>
       <p className="screen-sub">{tx('Everything saved on this phone, newest first.', 'Kila kitu kilichohifadhiwa kwenye simu hii, kipya kwanza.')}</p>
 
-      <div className="hist-tabs" role="tablist" aria-label={tx('History sections', 'Sehemu za historia')}>
-        {tabs.map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            id={`tab-${id}`}
-            aria-selected={tab === id}
-            aria-controls={`panel-${id}`}
-            onClick={() => {
-              setTab(id);
-              window.history.replaceState(null, '', `#${id}`);
-            }}
-          >
-            {label}
-            {id === 'alerts' && alerts.some((a) => a.level === 'RED' && !a.acknowledgedAtMs) ? <i className="hist-tabs__dot" aria-hidden /> : null}
-          </button>
-        ))}
-      </div>
+      <Segmented
+        mode="tabs"
+        idPrefix="hist"
+        ariaLabel={tx('History sections', 'Sehemu za historia')}
+        value={tab}
+        onChange={(id) => {
+          setTab(id);
+          window.history.replaceState(null, '', `#${id}`);
+        }}
+        options={tabs.map(([id, label]) => ({
+          value: id,
+          label,
+          dot: id === 'alerts' && alerts.some((a) => a.level === 'RED' && !a.acknowledgedAtMs),
+        }))}
+      />
 
       {tab === 'readings' && (
-        <section id="panel-readings" role="tabpanel" aria-labelledby="tab-readings" className="hist-panel">
+        <section id="hist-panel-readings" role="tabpanel" aria-labelledby="hist-tab-readings" tabIndex={0} className="hist-panel">
           <div className="home-card">
             <div className="hist-head">
               <h2>{tx('Blood pressure', 'Shinikizo la damu')}</h2>
-              <button type="button" className="home-link" onClick={() => nav('/bp')}>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => nav('/bp')}>
                 + {tx('Add', 'Ongeza')}
               </button>
             </div>
@@ -160,7 +157,7 @@ export function HistoryPage() {
           <div className="home-card">
             <div className="hist-head">
               <h2>{tx('Symptoms you logged', 'Dalili ulizoandika')}</h2>
-              <button type="button" className="home-link" onClick={() => nav('/symptoms')}>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => nav('/symptoms')}>
                 + {tx('Add', 'Ongeza')}
               </button>
             </div>
@@ -181,7 +178,7 @@ export function HistoryPage() {
       )}
 
       {tab === 'alerts' && (
-        <section id="panel-alerts" role="tabpanel" aria-labelledby="tab-alerts" className="hist-panel">
+        <section id="hist-panel-alerts" role="tabpanel" aria-labelledby="hist-tab-alerts" tabIndex={0} className="hist-panel">
           <div className="home-card">
             <h2 className="hist-h2">{tx('Alerts', 'Tahadhari')}</h2>
             {alerts.length === 0 ? (
@@ -217,7 +214,7 @@ export function HistoryPage() {
       )}
 
       {tab === 'visits' && (
-        <section id="panel-visits" role="tabpanel" aria-labelledby="tab-visits" className="hist-panel">
+        <section id="hist-panel-visits" role="tabpanel" aria-labelledby="hist-tab-visits" tabIndex={0} className="hist-panel">
           <div className="home-card">
             <h2 className="hist-h2">{tx('Clinic visits', 'Ziara za kliniki')}</h2>
             {visits.length === 0 ? (
@@ -267,11 +264,11 @@ export function HistoryPage() {
       )}
 
       {tab === 'notes' && (
-        <section id="panel-notes" role="tabpanel" aria-labelledby="tab-notes" className="hist-panel">
+        <section id="hist-panel-notes" role="tabpanel" aria-labelledby="hist-tab-notes" tabIndex={0} className="hist-panel">
           <div className="home-card">
             <div className="hist-head">
               <h2>{tx('My notes', 'Maelezo yangu')}</h2>
-              <button type="button" className="home-link" onClick={() => nav('/profile#health')}>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => nav('/profile#health')}>
                 {tx('Edit', 'Badilisha')}
               </button>
             </div>

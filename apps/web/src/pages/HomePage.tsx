@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getDefaultTriageConfig, insightForWeek, type BpReading } from '@neema/core';
+import { getDefaultTriageConfig, insightForWeek, nextAncContact, type BpReading } from '@neema/core';
 import { useGuardian } from '../hooks/useGuardian';
 import { useLocale } from '../hooks/useLocale';
 import { useToday } from '../hooks/useToday';
@@ -12,6 +12,7 @@ import { recheckDelayMs } from '../services/recheck';
 import { openEmergencyDialer } from '../services/emergency';
 import { LoadingScreen } from '../ui/LoadingScreen';
 import { EmergencyHoldButton } from '../ui/EmergencyHoldButton';
+import { BabyStageArt } from '../ui/BabyStageArt';
 import { IconBell, IconChat, IconChevron, IconHeart, IconPressure, IconTemp } from '../ui/icons';
 
 /** Thresholds come from the (placeholder, unsigned) triage config, never from this file. */
@@ -194,30 +195,37 @@ export function HomePage() {
 
   const dateLine = new Date(nowMs).toLocaleDateString(sw ? 'sw-KE' : 'en-KE', { weekday: 'long', day: 'numeric', month: 'long' });
 
+  const anc = preg ? nextAncContact(preg.weeks) : null;
+  const babyLabel = preg
+    ? tx(`Illustration of a baby at about ${preg.weeks} weeks (not to scale)`, `Mchoro wa mtoto wa karibu wiki ${preg.weeks} (si kwa kipimo halisi)`)
+    : '';
+
   return (
     <main className="screen screen--home home2" data-level={level}>
       {g.loading ? <LoadingScreen /> : null}
 
-      <header className="home2__head">
-        <div className="home2__greet">
-          <p className="home2__date">{dateLine}</p>
-          <h1 className="home2__hello">
-            {t(greetingKey(new Date(nowMs).getHours()))}, {name}
-          </h1>
+      <header className="home2__bar">
+        <p className="home2__date">{dateLine}</p>
+        <div className="home2__actions">
+          <button
+            type="button"
+            className="icon-btn home2__bell"
+            aria-label={alertActive ? tx('Alerts: something needs attention', 'Tahadhari: kuna jambo la kuangalia') : tx('Alerts', 'Tahadhari')}
+            onClick={() => nav(alertActive ? '/alert' : '/history#alerts')}
+          >
+            <IconBell />
+            {alertActive || openLoops > 0 ? <span className="icon-btn__dot" aria-hidden /> : null}
+          </button>
+          <EmergencyHoldButton lang={lang} onTrigger={emergency} />
         </div>
-        <button
-          type="button"
-          className="icon-btn home2__bell"
-          aria-label={alertActive ? tx('Alerts: something needs attention', 'Tahadhari: kuna jambo la kuangalia') : tx('Alerts', 'Tahadhari')}
-          onClick={() => nav(alertActive ? '/alert' : '/history#alerts')}
-        >
-          <IconBell />
-          {alertActive || openLoops > 0 ? <span className="icon-btn__dot" aria-hidden /> : null}
-        </button>
-        <EmergencyHoldButton lang={lang} onTrigger={emergency} />
       </header>
 
-      {/* 1. Alert banner: only when something needs doing. Never hidden by reassuring cards. */}
+      {/* FIRST: greeting */}
+      <h1 className="home2__hello">
+        {t(greetingKey(new Date(nowMs).getHours()))}, {name}
+      </h1>
+
+      {/* Safety: an active alert always shows right under the greeting. */}
       {alertActive ? (
         <section className="home-alert" data-level={level} role="alert" aria-live="assertive">
           <strong className="home-alert__title">{level === 'RED' ? t('call_chp') : t('check_bp')}</strong>
@@ -274,22 +282,42 @@ export function HomePage() {
         </button>
       ) : null}
 
-      {/* 2. Pregnancy progress */}
-      <section className="home-card preg" aria-label={tx('Pregnancy progress', 'Maendeleo ya mimba')}>
+      {/* SECOND: daily check-in */}
+      <section className="checkin2" aria-labelledby="checkin-title">
+        <span className="checkin2__icon" aria-hidden>
+          <IconChat />
+        </span>
+        <h2 id="checkin-title" className="checkin2__title">
+          {tx('How are you feeling today?', 'Unajisikiaje leo?')}
+        </h2>
+        <p className="checkin2__sub">{tx("Talk to Neema about how you're feeling.", 'Ongea na Neema kuhusu unavyojisikia.')}</p>
+        {today.symptomsToday ? (
+          <p className="checkin2__done">{tx('You shared how you feel today. Tell Neema if anything changes.', 'Umeeleza unavyojisikia leo. Mwambie Neema kitu kikibadilika.')}</p>
+        ) : null}
+        <button type="button" className="btn checkin2__btn" onClick={() => nav('/care')}>
+          {tx('Start Daily Check-in', 'Anza Ukaguzi wa Leo')}
+        </button>
+        <button type="button" className="checkin2__alt" onClick={() => nav('/symptoms')}>
+          {tx('Or log a symptom', 'Au andika dalili')}
+        </button>
+      </section>
+
+      {/* THIRD: pregnancy progress + this week, one card */}
+      <section className="home-card preg2" aria-labelledby="preg-title">
         {preg ? (
           <>
-            <div className="preg__top">
-              <div>
-                <p className="home-card__eyebrow">{tx('Your pregnancy', 'Mimba yako')}</p>
+            <div className="preg2__top">
+              <BabyStageArt week={preg.weeks} label={babyLabel} />
+              <div className="preg2__stats">
+                <p className="home-card__eyebrow" id="preg-title">
+                  {tx('Your pregnancy', 'Mimba yako')}
+                </p>
                 <p className="preg__week">
                   {tx(`Week ${preg.weeks}`, `Wiki ${preg.weeks}`)}
-                  <span>
-                    {' '}
-                    {tx(`· day ${preg.days}`, `· siku ${preg.days}`)}
-                  </span>
+                  <span> {tx(`· day ${preg.days}`, `· siku ${preg.days}`)}</span>
                 </p>
+                <span className="preg__tri">{tx(`Trimester ${preg.trimester}`, `Kipindi ${preg.trimester}`)}</span>
               </div>
-              <span className="preg__tri">{tx(`Trimester ${preg.trimester}`, `Kipindi ${preg.trimester}`)}</span>
             </div>
             <div
               className="preg__bar"
@@ -304,7 +332,7 @@ export function HomePage() {
               <i style={{ left: '70%' }} aria-hidden />
             </div>
             <p className="preg__due">
-              {tx('Due around', 'Kujifungua karibu')} <strong>{fmtDate(preg.eddMs)}</strong>
+              {tx('Estimated due date', 'Tarehe ya kujifungua (makadirio)')}: <strong>{fmtDate(preg.eddMs)}</strong>
               {' · '}
               {preg.daysToEdd > 0
                 ? tx(`${preg.daysToEdd} days to go`, `siku ${preg.daysToEdd} zimebaki`)
@@ -312,92 +340,83 @@ export function HomePage() {
                   ? tx('due today', 'ni leo')
                   : tx(`${-preg.daysToEdd} days past due date`, `siku ${-preg.daysToEdd} baada ya tarehe`)}
             </p>
+
+            {insight ? (
+              <div className="preg2__week">
+                <h2 className="preg2__h">{tx('This week and your pregnancy', 'Wiki hii na mimba yako')}</h2>
+                <div className="preg2__item">
+                  <h3>{tx('Your baby', 'Mtoto wako')}</h3>
+                  <p>
+                    <strong>{sw ? insight.sizeSw : insight.sizeEn}.</strong> {sw ? insight.babySw : insight.babyEn}
+                  </p>
+                </div>
+                <div className="preg2__item">
+                  <h3>{tx('What you may feel', 'Unachoweza kuhisi')}</h3>
+                  <p>{sw ? insight.feelSw : insight.feelEn}</p>
+                </div>
+                <div className="preg2__item">
+                  <h3>{tx('What to expect', 'Cha kutarajia')}</h3>
+                  <p>
+                    {anc
+                      ? anc.inWeeks === 0
+                        ? tx(`A clinic visit is recommended this week (visit ${anc.number} of 8).`, `Ziara ya kliniki inapendekezwa wiki hii (ziara ${anc.number} kati ya 8).`)
+                        : tx(
+                            `Next recommended clinic visit: around week ${anc.week} (visit ${anc.number} of 8). Your clinic gives your real date.`,
+                            `Ziara ijayo ya kliniki inayopendekezwa: karibu wiki ${anc.week} (ziara ${anc.number} kati ya 8). Kliniki yako hukupa tarehe halisi.`,
+                          )
+                      : tx('You are past 40 weeks. Stay in close touch with your clinic.', 'Umepita wiki 40. Wasiliana na kliniki yako kwa karibu.')}
+                  </p>
+                </div>
+                {insightOpen ? (
+                  <div className="preg2__item" id="insight-more">
+                    <h3>{tx('Good to do', 'Vizuri kufanya')}</h3>
+                    <p>{sw ? insight.doSw : insight.doEn}</p>
+                  </div>
+                ) : null}
+                <div className="preg2__watch">
+                  <h3>{tx('Get help straight away if', 'Tafuta msaada mara moja kama')}</h3>
+                  <p>{sw ? insight.watchSw : insight.watchEn}</p>
+                </div>
+                <div className="preg2__foot">
+                  <button type="button" className="btn btn-secondary btn-sm" aria-expanded={insightOpen} aria-controls="insight-more" onClick={() => setInsightOpen((v) => !v)}>
+                    {insightOpen ? tx('Show less', 'Onyesha kidogo') : tx('More guidance', 'Ushauri zaidi')}
+                  </button>
+                  <p className="insight__src">
+                    {tx('Adapted from the ', 'Imetoholewa kutoka ')}
+                    <a href={insight.sourceUrl} target="_blank" rel="noreferrer">
+                      {tx('NHS guide', 'mwongozo wa NHS')}
+                    </a>
+                    {tx(' and WHO ANC guidance', ' na mwongozo wa WHO')}
+                    {insight.status !== 'reviewed' ? <span className="insight__draft">{tx('Draft: awaiting nurse review', 'Rasimu: inasubiri muuguzi')}</span> : null}
+                  </p>
+                </div>
+              </div>
+            ) : null}
           </>
         ) : today.stage === 'postpartum' ? (
           <>
-            <p className="home-card__eyebrow">{tx('After birth', 'Baada ya kujifungua')}</p>
+            <p className="home-card__eyebrow" id="preg-title">
+              {tx('After birth', 'Baada ya kujifungua')}
+            </p>
             <p className="preg__empty">{tx('Neema keeps watching your readings in the weeks after birth.', 'Neema anaendelea kuangalia vipimo vyako wiki baada ya kujifungua.')}</p>
           </>
         ) : (
           <>
-            <p className="home-card__eyebrow">{tx('Your pregnancy', 'Mimba yako')}</p>
+            <p className="home-card__eyebrow" id="preg-title">
+              {tx('Your pregnancy', 'Mimba yako')}
+            </p>
             <p className="preg__empty">{tx('Add your weeks or due date from the clinic card to see your progress.', 'Ongeza wiki au tarehe ya kujifungua kutoka kadi ya kliniki kuona maendeleo.')}</p>
-            <button type="button" className="home-link" onClick={() => nav('/profile#pregnancy')}>
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => nav('/profile#pregnancy')}>
               {tx('Add pregnancy details', 'Ongeza maelezo ya mimba')}
-              <IconChevron />
             </button>
           </>
         )}
       </section>
 
-      {/* 3. This week */}
-      {insight ? (
-        <section className="home-card insight" aria-labelledby="insight-title">
-          <p className="home-card__eyebrow">{tx('This week', 'Wiki hii')}</p>
-          <h2 id="insight-title" className="insight__title">
-            {tx('Your baby: ', 'Mtoto wako: ')}
-            {sw ? insight.sizeSw : insight.sizeEn}
-          </h2>
-          <p className="insight__line">{sw ? insight.babySw : insight.babyEn}</p>
-          <p className="insight__line">
-            <strong>{tx('You may feel: ', 'Unaweza kuhisi: ')}</strong>
-            {sw ? insight.feelSw : insight.feelEn}
-          </p>
-          {insightOpen ? (
-            <div id="insight-more">
-              <p className="insight__line">
-                <strong>{tx('Good to do: ', 'Vizuri kufanya: ')}</strong>
-                {sw ? insight.doSw : insight.doEn}
-              </p>
-              <p className="insight__watch">
-                <strong>{tx('Get help: ', 'Tafuta msaada: ')}</strong>
-                {sw ? insight.watchSw : insight.watchEn}
-              </p>
-              <p className="insight__src">
-                {tx('Adapted from the ', 'Imetoholewa kutoka ')}
-                <a href={insight.sourceUrl} target="_blank" rel="noreferrer">
-                  {tx('NHS pregnancy guide', 'mwongozo wa NHS')}
-                </a>
-                {insight.status !== 'reviewed' ? (
-                  <span className="insight__draft">{tx('Draft: awaiting nurse review', 'Rasimu: inasubiri muuguzi')}</span>
-                ) : null}
-              </p>
-            </div>
-          ) : null}
-          <button type="button" className="home-link" aria-expanded={insightOpen} aria-controls="insight-more" onClick={() => setInsightOpen((v) => !v)}>
-            {insightOpen ? tx('Show less', 'Onyesha kidogo') : tx('Read more', 'Soma zaidi')}
-            <IconChevron />
-          </button>
-        </section>
-      ) : null}
-
-      {/* 4. Daily check-in */}
-      <section className="home-card checkin">
-        <span className="checkin__icon" aria-hidden>
-          <IconChat />
-        </span>
-        <div className="checkin__text">
-          <h2>{tx('How are you feeling today?', 'Unajisikiaje leo?')}</h2>
-          <p>
-            {today.symptomsToday
-              ? tx('You shared how you feel today. Tell Neema if anything changes.', 'Umeeleza unavyojisikia leo. Mwambie Neema kitu kikibadilika.')
-              : tx('Tell Neema in your own words. She will guide you.', 'Mwambie Neema kwa maneno yako. Atakuongoza.')}
-          </p>
-          <div className="checkin__btns">
-            <button type="button" className="btn btn-primary" onClick={() => nav('/care')}>
-              {tx('Talk to Neema', 'Ongea na Neema')}
-            </button>
-            <button type="button" className="btn btn-ghost" onClick={() => nav('/symptoms')}>
-              {tx('Log a symptom', 'Andika dalili')}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. Readings */}
+      {/* FOURTH: readings */}
       <section className="home-card reads" aria-labelledby="reads-title" data-attention={anyAttention}>
         <div className="reads__head">
-          <h2 id="reads-title">{tx('Your readings', 'Vipimo vyako')}</h2>
+          <h2 id="reads-title">{tx('Your latest readings', 'Vipimo vyako vya karibuni')}</h2>
           {anyAttention ? <span className="reads__chip">{tx('Needs attention', 'Inahitaji uangalifu')}</span> : null}
         </div>
 
@@ -423,7 +442,7 @@ export function HomePage() {
         />
         <ReadRow
           icon={<IconTemp />}
-          label={tx('Temperature', 'Joto la mwili')}
+          label={tx('Body temperature', 'Joto la mwili')}
           value={temp === null ? '—' : temp.toFixed(1)}
           unit={temp === null ? '' : '°C'}
           time={sampleTs ? when(sampleTs, lang, nowMs) : ''}
@@ -436,16 +455,22 @@ export function HomePage() {
           <button type="button" className="btn btn-primary" onClick={() => nav('/bp')}>
             {tx('Add blood pressure', 'Ongeza shinikizo')}
           </button>
-          <button type="button" className="btn btn-ghost" onClick={() => nav('/history')}>
-            {tx('See history', 'Ona historia')}
-          </button>
+          {!g.connected ? (
+            <button type="button" className="btn btn-secondary" onClick={() => nav('/vitals')}>
+              {tx('Connect band', 'Unganisha bendi')}
+            </button>
+          ) : null}
         </div>
-        {!g.connected ? (
-          <button type="button" className="home-link" onClick={() => nav('/vitals')}>
-            {tx('Connect your band', 'Unganisha bendi yako')}
-            <IconChevron />
-          </button>
-        ) : null}
+        <a
+          className="n-link reads__history"
+          href="/history"
+          onClick={(e) => {
+            e.preventDefault();
+            nav('/history');
+          }}
+        >
+          {tx('View health history', 'Ona historia ya afya')} →
+        </a>
         <p className="reads__note">
           {tx('Neema does not diagnose. Alert levels are set by your health team.', 'Neema hatambui ugonjwa. Viwango vya hatari huwekwa na timu ya afya.')}
         </p>

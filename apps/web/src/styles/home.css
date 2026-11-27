@@ -590,3 +590,223 @@ svg.read-row__spark[data-tone='alert'] polyline {
   text-align: center;
   margin: 0;
 }
+
+/* ---------- Home v3: greeting, check-in, unified pregnancy card ---------- */
+.home2__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.home2__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.home2 > .home2__hello {
+  margin: -0.2rem 0 0;
+  font-size: clamp(1.6rem, 7vw, 2.2rem);
+  line-height: 1.12;
+}
+
+/* Daily check-in: the most prominent card. */
+.checkin2 {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: 0.3rem;
+  padding: 1.2rem 1.15rem 1rem;
+  border-radius: var(--radius);
+  color: #fff;
+  background:
+    radial-gradient(90% 120% at 100% 0%, rgba(90, 128, 191, 0.55), transparent 60%),
+    linear-gradient(160deg, #24304d, #121a2c);
+  box-shadow: 0 14px 30px rgba(18, 26, 44, 0.25);
+}
+
+.checkin2__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.14);
+  margin-bottom: 0.2rem;
+}
+
+.checkin2__icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.home-card h2.checkin2__title,
+.checkin2__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 500;
+  color: #fff;
+}
+
+.checkin2__sub {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.checkin2__done {
+  margin: 0.2rem 0 0;
+  font-size: 0.86rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.btn.checkin2__btn {
+  margin-top: 0.75rem;
+  width: 100%;
+  min-height: 54px;
+  background: #fff;
+  border-color: #fff;
+  color: var(--primary);
+  font-size: 1.05rem;
+}
+
+.btn.checkin2__btn:hover {
+  background: #e9edf4;
+}
+
+.checkin2__alt {
+  justify-self: center;
+  min-height: 44px;
+  padding: 0 0.8rem;
+  border: 0;
+  background: none;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.checkin2__alt:focus-visible,
+.btn.checkin2__btn:focus-visible {
+  outline-color: #fff;
+}
+
+/* Unified pregnancy card */
+.preg2 {
+  background:
+    radial-gradient(120% 70% at 100% 0%, rgba(159, 180, 214, 0.3), transparent 55%),
+    var(--glass-strong);
+}
+
+.preg2__top {
+  display: grid;
+  grid-template-columns: 112px 1fr;
+  gap: 0.9rem;
+  align-items: center;
+}
+
+.baby-art {
+  width: 112px;
+  height: auto;
+  display: block;
+}
+
+.preg2__stats {
+  display: grid;
+  justify-items: start;
+  gap: 0.35rem;
+}
+
+.preg2__stats .preg__week {
+  margin: 0;
+}
+
+.preg2__week {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 0.75rem;
+}
+
+.home-card h2.preg2__h,
+.preg2__h {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: var(--n-label);
+}
+
+.preg2__item h3,
+.preg2__watch h3 {
+  margin: 0 0 0.15rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--n-label);
+}
+
+.preg2__item p,
+.preg2__watch p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.preg2__watch {
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--radius-sm);
+  background: rgba(193, 58, 82, 0.08);
+  border-left: 4px solid var(--danger);
+}
+
+.preg2__watch h3 {
+  color: var(--danger-deep);
+}
+
+.preg2__foot {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+}
+
+.reads__history {
+  display: inline-block;
+  margin-top: 0.8rem;
+}
+
+@media (min-width: 560px) {
+  .preg2__top {
+    grid-template-columns: 160px 1fr;
+  }
+  .baby-art {
+    width: 160px;
+  }
+  .preg2__week {
+    grid-template-columns: 1fr 1fr;
+  }
+  .preg2__h,
+  .preg2__watch,
+  .preg2__foot {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 900px) {
+  .home2__bar,
+  .home2 > .home2__hello,
+  .checkin2 {
+    grid-column: 1 / -1;
+  }
+  .preg2 {
+    grid-row: span 2;
+  }
+  .reads {
+    grid-row: auto;
+  }
+}

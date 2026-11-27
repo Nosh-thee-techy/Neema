@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  EMPTY_ALLERGIES,
+  TERMS_VERSION,
   eddFromGestationalAge,
   isPlaceholderPhone,
   isValidGestationalAge,
@@ -8,18 +10,28 @@ import {
   parseLocalIsoDate,
   pregnancyProgress,
   toLocalIsoDate,
+  validateRegistration,
+  type AllergyAnswer,
   type Contact,
+  type RegistrationError,
+  type RegistrationErrors,
+  type RegistrationField,
 } from '@neema/core';
-import { Button } from '../ui/Button';
 import { BrandMark } from '../ui/BrandMark';
 import { LangToggle } from '../ui/LangToggle';
+import { Segmented } from '../ui/Segmented';
+import { FieldError, FormField, RequiredMark, invalidProps } from '../ui/FormField';
+import { AllergyPicker, allergyLabel } from '../ui/AllergyPicker';
+import { TermsContent } from '../ui/TermsContent';
 import { useLocale } from '../hooks/useLocale';
 import { loadOnboarding, saveOnboarding } from '../hooks/useOnboarding';
 import {
   EMPTY_BIRTH_PLAN,
+  allergyAnswerOf,
   loadProfile,
   saveConsent,
   saveProfile,
+  withAllergies,
   type MamaProfile,
   type RegistrarRole,
 } from '../services/passport';
@@ -27,8 +39,10 @@ import { listContacts, saveContact } from '../services/contacts';
 import { addClinicalNote } from '../services/clinicalNotes';
 
 /**
- * Multi-step registration. Can be filled by the mother herself, a CHW, or a nurse.
- * Nothing is saved until the last step ("Finish"), after consent.
+ * Multi-step registration for the mother herself, a CHW, or a nurse.
+ * Required: full name, how far along (while pregnant), Terms acceptance.
+ * The same rules live in @neema/core `validateRegistration` for the future server.
+ * Nothing is saved until Finish.
  */
 
 type StepId = 'who' | 'about' | 'pregnancy' | 'health' | 'contacts' | 'clinical' | 'consent' | 'review';
@@ -46,7 +60,7 @@ interface Draft {
   callsConsent: boolean;
   location: string;
   stage: 'pregnancy' | 'postpartum';
-  datingMode: 'weeks' | 'due' | 'unknown';
+  datingMode: 'weeks' | 'due';
   gaWeeks: string;
   gaDays: string;
   dueDate: string;
@@ -55,7 +69,7 @@ interface Draft {
   pastComplications: string[];
   conditions: string[];
   otherCondition: string;
-  allergies: string;
+  allergies: AllergyAnswer;
   medications: string;
   healthNotes: string;
   chpName: string;
@@ -66,7 +80,7 @@ interface Draft {
   shareChp: boolean;
   shareFamily: boolean;
   shareNurse: boolean;
-  agreed: boolean;
+  termsAccepted: boolean;
 }
 
 const EMPTY: Draft = {
@@ -91,7 +105,7 @@ const EMPTY: Draft = {
   pastComplications: [],
   conditions: [],
   otherCondition: '',
-  allergies: '',
+  allergies: EMPTY_ALLERGIES,
   medications: '',
   healthNotes: '',
   chpName: '',
@@ -102,7 +116,7 @@ const EMPTY: Draft = {
   shareChp: true,
   shareFamily: true,
   shareNurse: true,
-  agreed: false,
+  termsAccepted: false, // never pre-ticked
 };
 
 const COMPLICATIONS = [
@@ -122,7 +136,24 @@ const CONDITIONS = [
   { key: 'heart', en: 'Heart problem', sw: 'Tatizo la moyo' },
 ] as const;
 
-const DAY = 86_400_000;
+/** Which step shows each field, so Finish can jump back to the first problem. */
+const FIELD_STEP: Record<RegistrationField, StepId> = {
+  registrarName: 'who',
+  fullName: 'about',
+  dateOfBirth: 'about',
+  phone: 'about',
+  gestationalAge: 'pregnancy',
+  dueDate: 'pregnancy',
+  firstPregnancy: 'pregnancy',
+  previousPregnancies: 'pregnancy',
+  allergies: 'health',
+  chpName: 'contacts',
+  chpPhone: 'contacts',
+  familyName: 'contacts',
+  familyPhone: 'contacts',
+  terms: 'consent',
+  sharing: 'consent',
+};
 
 function splitList(text: string): string[] {
   return text
@@ -131,22 +162,17 @@ function splitList(text: string): string[] {
     .filter(Boolean);
 }
 
-/** Age in whole years for an ISO date; null when not a date. */
-function ageFrom(iso: string, nowMs: number): number | null {
-  const ms = Date.parse(iso);
-  if (!Number.isFinite(ms)) return null;
-  return Math.floor((nowMs - ms) / (365.25 * DAY));
-}
-
 export function RegisterPage() {
   const nav = useNavigate();
   const { lang } = useLocale();
-  const tx = (en: string, sw: string) => (lang === 'sw' ? sw : en);
+  const sw = lang === 'sw';
+  const tx = (en: string, s: string) => (sw ? s : en);
   const [d, setD] = useState<Draft>(EMPTY);
   const [stepIdx, setStepIdx] = useState(0);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<RegistrationErrors>({});
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [showTerms, setShowTerms] = useState(false);
   const [nowMs] = useState(() => Date.now());
 
   // Prefill from an earlier install so re-registering does not wipe anything.
@@ -167,6 +193,7 @@ export function RegisterPage() {
               stage: p.stage ?? 'pregnancy',
               dueDate: p.expectedDeliveryDate ?? '',
               datingMode: p.expectedDeliveryDate && p.gaWeeks === undefined ? 'due' : 'weeks',
+              allergies: allergyAnswerOf(p),
             }
           : {}),
         ...(chp ? { chpName: chp.name, chpPhone: chp.phone } : {}),
@@ -176,12 +203,9 @@ export function RegisterPage() {
   }, []);
 
   const self = d.role === 'self';
-  /** "your" when she registers herself, "her" / "the mother's" when a health worker does. */
-  const yourName = self ? tx('Your name', 'Jina lako') : tx("Mother's name", 'Jina la mama');
 
   const steps: StepId[] = useMemo(
-    () =>
-      ['who', 'about', 'pregnancy', 'health', 'contacts', ...(d.role === 'nurse' ? (['clinical'] as const) : []), 'consent', 'review'] as StepId[],
+    () => ['who', 'about', 'pregnancy', 'health', 'contacts', ...(d.role === 'nurse' ? (['clinical'] as const) : []), 'consent', 'review'] as StepId[],
     [d.role],
   );
   const step = steps[Math.min(stepIdx, steps.length - 1)]!;
@@ -193,18 +217,12 @@ export function RegisterPage() {
     health: tx('Health', 'Afya'),
     contacts: tx('Contacts', 'Watu'),
     clinical: tx('Nurse', 'Muuguzi'),
-    consent: tx('Consent', 'Idhini'),
+    consent: tx('Terms', 'Masharti'),
     review: tx('Review', 'Hakiki'),
   };
 
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     setD((cur) => ({ ...cur, [key]: value }));
-    setErrors((e) => {
-      if (!e[key as string]) return e;
-      const next = { ...e };
-      delete next[key as string];
-      return next;
-    });
   }
 
   function toggleIn(key: 'pastComplications' | 'conditions', item: string) {
@@ -212,75 +230,103 @@ export function RegisterPage() {
     set(key, list.includes(item) ? list.filter((x) => x !== item) : [...list, item]);
   }
 
-  // ── Validation ──────────────────────────────────────────────────────────
-  function validate(s: StepId): Record<string, string> {
-    const e: Record<string, string> = {};
-    if (s === 'who' && !self && !d.registrarName.trim()) {
-      e.registrarName = tx('Enter your name so the record shows who registered her.', 'Andika jina lako ili ijulikane nani alimsajili.');
-    }
-    if (s === 'about') {
-      if (!d.displayName.trim()) e.displayName = tx('Please enter a name.', 'Tafadhali andika jina.');
-      if (d.dateOfBirth) {
-        const age = ageFrom(d.dateOfBirth, nowMs);
-        if (age === null || age < 10 || age > 60) e.dateOfBirth = tx('Check the date of birth.', 'Angalia tarehe ya kuzaliwa.');
-      }
-      if (d.phoneKind === 'basic' && !d.phone.trim()) {
-        e.phone = tx('Enter her phone number so the team can call her.', 'Andika namba yake ili timu impigie.');
-      }
-      if (d.phone.trim()) {
-        const n = normalizePhone(d.phone);
-        if (!n || isPlaceholderPhone(n)) e.phone = tx('This does not look like a phone number. Example: 0712 345 678', 'Hii si namba sahihi. Mfano: 0712 345 678');
-      }
-    }
-    if (s === 'pregnancy' && d.stage === 'pregnancy') {
-      if (d.datingMode === 'weeks') {
-        const w = Number(d.gaWeeks);
-        const dd = Number(d.gaDays || '0');
-        if (d.gaWeeks === '' || !isValidGestationalAge(w, dd) || w < 1 || w > 42) {
-          e.gaWeeks = tx('Enter weeks between 1 and 42, and days 0 to 6.', 'Andika wiki kati ya 1 na 42, na siku 0 hadi 6.');
-        }
-      }
-      if (d.datingMode === 'due') {
-        const ms = (parseLocalIsoDate(d.dueDate) ?? NaN);
-        const prog = Number.isFinite(ms) ? pregnancyProgress({ kind: 'edd', eddMs: ms }, nowMs) : null;
-        if (!prog) e.dueDate = tx('That due date does not fit a current pregnancy. Check it with the clinic card.', 'Tarehe hiyo haiendani na mimba ya sasa. Angalia kadi ya kliniki.');
-      }
-      if (!d.firstPregnancy) e.firstPregnancy = tx('Please choose one.', 'Tafadhali chagua moja.');
-      if (d.firstPregnancy === 'no') {
-        const n = Number(d.previousPregnancies);
-        if (d.previousPregnancies !== '' && (!Number.isInteger(n) || n < 1 || n > 20)) {
-          e.previousPregnancies = tx('Enter a number from 1 to 20.', 'Andika namba kutoka 1 hadi 20.');
-        }
-      }
-    }
-    if (s === 'contacts') {
-      const checkPhone = (key: 'chpPhone' | 'familyPhone', nameKey: 'chpName' | 'familyName') => {
-        if (!d[key].trim() && !d[nameKey].trim()) return;
-        if (!d[nameKey].trim()) e[nameKey] = tx('Add a name.', 'Ongeza jina.');
-        const n = normalizePhone(d[key]);
-        if (!n || isPlaceholderPhone(n)) e[key] = tx('Enter a real phone number. Example: 0712 345 678', 'Andika namba halisi. Mfano: 0712 345 678');
-      };
-      checkPhone('chpPhone', 'chpName');
-      checkPhone('familyPhone', 'familyName');
-    }
-    if (s === 'clinical' && d.clinicalNote.trim() && !d.registrarName.trim()) {
-      e.clinicalNote = tx('Go back to step 1 and add your name: notes must show who wrote them.', 'Rudi hatua ya 1 uweke jina lako: maelezo lazima yaonyeshe aliyeandika.');
-    }
-    if (s === 'consent') {
-      if (!d.agreed) e.agreed = tx('Please read and agree to continue.', 'Tafadhali soma na ukubali ili kuendelea.');
-      if (!d.shareChp && !d.shareFamily) e.shareChp = tx('Choose at least one person who may get an alert.', 'Chagua angalau mtu mmoja wa kupokea tahadhari.');
-    }
+  // ── Validation (shared rules) ───────────────────────────────────────────
+  function allErrors(): RegistrationErrors {
+    const e = validateRegistration({
+      registrarRole: d.role,
+      registrarName: d.registrarName,
+      fullName: d.fullName,
+      ...(d.dateOfBirth ? { dateOfBirth: d.dateOfBirth } : {}),
+      phone: d.phone,
+      ...(self ? {} : { phoneKind: d.phoneKind }),
+      stage: d.stage,
+      dating:
+        d.datingMode === 'weeks'
+          ? { mode: 'weeks', weeks: d.gaWeeks === '' ? null : Number(d.gaWeeks), days: Number(d.gaDays || 0) }
+          : { mode: 'due', dueDateMs: d.dueDate ? parseLocalIsoDate(d.dueDate) : null },
+      firstPregnancy: d.firstPregnancy === '' ? null : d.firstPregnancy === 'yes',
+      previousPregnancies: d.previousPregnancies === '' ? null : Number(d.previousPregnancies),
+      allergies: d.allergies,
+      chpName: d.chpName,
+      chpPhone: d.chpPhone,
+      familyName: d.familyName,
+      familyPhone: d.familyPhone,
+      termsAccepted: d.termsAccepted,
+      shareChp: d.shareChp,
+      shareFamily: d.shareFamily,
+      nowMs,
+    });
     return e;
   }
 
-  function next() {
-    const e = validate(step);
-    setErrors(e);
-    if (Object.keys(e).length) {
-      // Move focus to the first problem so screen readers and small screens see it.
-      requestAnimationFrame(() => document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
-      return;
+  function errorsFor(s: StepId): RegistrationErrors {
+    const all = allErrors();
+    const out: RegistrationErrors = {};
+    for (const [f, code] of Object.entries(all) as Array<[RegistrationField, RegistrationError]>) {
+      if (FIELD_STEP[f] === s) out[f] = code;
     }
+    return out;
+  }
+
+  /** Words for each error, specific to the field. */
+  function msg(field: RegistrationField): string | undefined {
+    const code = errors[field];
+    if (!code) return undefined;
+    const her = !self;
+    switch (field) {
+      case 'registrarName':
+        return tx('Enter your name so the record shows who registered her.', 'Andika jina lako ili ijulikane nani alimsajili.');
+      case 'fullName':
+        return code === 'too_short'
+          ? tx('The name looks too short. Enter the full name.', 'Jina ni fupi mno. Andika jina kamili.')
+          : her
+            ? tx("Enter the mother's full name.", 'Andika jina kamili la mama.')
+            : tx('Enter your full name.', 'Andika jina lako kamili.');
+      case 'dateOfBirth':
+        return tx('Check the date of birth: it should be a real date for someone 10 to 60 years old.', 'Angalia tarehe ya kuzaliwa: iwe ya mtu wa miaka 10 hadi 60.');
+      case 'phone':
+        return code === 'phone_required_for_calls'
+          ? tx('Enter her phone number so the team can call her.', 'Andika namba yake ili timu impigie.')
+          : tx('This does not look like a phone number. Example: 0712 345 678', 'Hii si namba sahihi. Mfano: 0712 345 678');
+      case 'gestationalAge':
+        return code === 'required'
+          ? tx('Enter how many weeks pregnant (from the clinic card), or switch to due date.', 'Andika wiki za mimba (kutoka kadi ya kliniki), au chagua tarehe ya kujifungua.')
+          : tx('Weeks must be 1 to 42, and days 0 to 6.', 'Wiki ziwe 1 hadi 42, na siku 0 hadi 6.');
+      case 'dueDate':
+        return code === 'required'
+          ? tx('Enter the due date from the clinic card.', 'Andika tarehe ya kujifungua kutoka kadi ya kliniki.')
+          : tx('That due date does not fit a current pregnancy. Check the clinic card.', 'Tarehe hiyo haiendani na mimba ya sasa. Angalia kadi ya kliniki.');
+      case 'firstPregnancy':
+        return tx('Choose Yes or No.', 'Chagua Ndiyo au Hapana.');
+      case 'previousPregnancies':
+        return tx('Enter a number from 1 to 20.', 'Andika namba kutoka 1 hadi 20.');
+      case 'allergies':
+        return tx('"No known allergies" cannot be picked together with an allergy.', '"Hakuna mzio" haiwezi kuchaguliwa pamoja na mzio.');
+      case 'chpName':
+      case 'familyName':
+        return tx('Add a name for this phone number.', 'Ongeza jina la namba hii.');
+      case 'chpPhone':
+      case 'familyPhone':
+        return code === 'required'
+          ? tx('Add a phone number for this person.', 'Ongeza namba ya simu ya mtu huyu.')
+          : tx('Enter a real phone number. Example: 0712 345 678', 'Andika namba halisi. Mfano: 0712 345 678');
+      case 'terms':
+        return her
+          ? tx('The mother must accept the Terms and Conditions before registering.', 'Mama lazima akubali Masharti na Vigezo kabla ya kusajiliwa.')
+          : tx('Please accept the Terms and Conditions to continue.', 'Tafadhali kubali Masharti na Vigezo ili kuendelea.');
+      case 'sharing':
+        return tx('Choose at least one person who may get an alert.', 'Chagua angalau mtu mmoja wa kupokea tahadhari.');
+    }
+  }
+
+  function focusFirstError() {
+    requestAnimationFrame(() => document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
+  }
+
+  function next() {
+    const e = errorsFor(step);
+    setErrors(e);
+    if (Object.keys(e).length) return focusFirstError();
     setStepIdx((i) => Math.min(i + 1, steps.length - 1));
     window.scrollTo({ top: 0 });
   }
@@ -305,37 +351,40 @@ export function RegisterPage() {
       return pregnancyProgress({ kind: 'ga', weeks: Number(d.gaWeeks), days: Number(d.gaDays || 0), recordedOnMs: nowMs }, nowMs);
     }
     if (d.datingMode === 'due' && d.dueDate) {
-      const ms = (parseLocalIsoDate(d.dueDate) ?? NaN);
-      return Number.isFinite(ms) ? pregnancyProgress({ kind: 'edd', eddMs: ms }, nowMs) : null;
+      const ms = parseLocalIsoDate(d.dueDate);
+      return ms !== null ? pregnancyProgress({ kind: 'edd', eddMs: ms }, nowMs) : null;
     }
     return null;
   }, [d.stage, d.datingMode, d.gaWeeks, d.gaDays, d.dueDate, nowMs]);
 
   const fmtDate = (ms: number) =>
-    new Date(ms).toLocaleDateString(lang === 'sw' ? 'sw-KE' : 'en-KE', { day: 'numeric', month: 'long', year: 'numeric' });
+    new Date(ms).toLocaleDateString(sw ? 'sw-KE' : 'en-KE', { day: 'numeric', month: 'long', year: 'numeric' });
 
   // ── Save ────────────────────────────────────────────────────────────────
   async function finish() {
-    for (const s of steps) {
-      const e = validate(s);
-      if (Object.keys(e).length) {
-        setErrors(e);
-        goTo(s);
-        return;
-      }
+    const all = allErrors();
+    if (Object.keys(all).length) {
+      const first = (Object.keys(all) as RegistrationField[])[0]!;
+      const target = FIELD_STEP[first];
+      goTo(target);
+      setErrors(errorsFor(target));
+      return focusFirstError();
     }
     setBusy(true);
     setSaveError(null);
     try {
       const existing = await loadProfile().catch(() => null);
       const conditions = [...d.conditions, ...(d.otherCondition.trim() ? [d.otherCondition.trim()] : [])];
-      const profile: MamaProfile = {
+      const fullName = d.fullName.trim();
+      const now = Date.now();
+      let profile: MamaProfile = {
         ...(existing ?? {}),
-        displayName: d.displayName.trim(),
+        fullName,
+        displayName: d.displayName.trim() || fullName.split(/\s+/)[0]!,
         language: lang,
         stage: d.stage,
         birthPlan: existing?.birthPlan ?? { ...EMPTY_BIRTH_PLAN },
-        registeredAtMs: Date.now(),
+        registeredAtMs: now,
         registeredBy: {
           role: d.role,
           ...(d.registrarName.trim() ? { name: d.registrarName.trim() } : {}),
@@ -346,45 +395,41 @@ export function RegisterPage() {
         if (v === undefined || v === '' || (Array.isArray(v) && v.length === 0)) delete profile[k];
         else profile[k] = v as MamaProfile[K];
       };
-      opt('fullName', d.fullName.trim());
       opt('dateOfBirth', d.dateOfBirth);
-      opt('phoneForAlerts', d.phone.trim() ? normalizePhone(d.phone) ?? undefined : undefined);
+      opt('phoneForAlerts', d.phone.trim() ? (normalizePhone(d.phone) ?? undefined) : undefined);
       opt('location', d.location.trim());
-      if (d.role !== 'self') {
-        profile.phoneKind = d.phoneKind;
-        profile.automatedCallsConsent = d.phoneKind !== 'none' && d.callsConsent;
-      }
       opt('facilityName', d.facilityName.trim());
       opt('nurseName', d.role === 'nurse' ? d.registrarName.trim() : existing?.nurseName);
       opt('pastComplications', d.firstPregnancy === 'no' ? d.pastComplications : []);
       opt('conditions', conditions);
-      opt('allergies', splitList(d.allergies));
       opt('medications', splitList(d.medications));
       opt('healthNotes', d.healthNotes.trim());
+      if (d.role !== 'self') {
+        profile.phoneKind = d.phoneKind;
+        profile.automatedCallsConsent = d.phoneKind !== 'none' && d.callsConsent;
+      }
+      profile = withAllergies(profile, d.allergies);
 
       if (d.stage === 'pregnancy') {
         profile.firstPregnancy = d.firstPregnancy === 'yes';
         opt('previousPregnancies', d.firstPregnancy === 'no' && d.previousPregnancies !== '' ? Number(d.previousPregnancies) : undefined);
         if (d.datingMode === 'weeks') {
-          const recorded = Date.now();
           profile.gaWeeks = Number(d.gaWeeks);
           profile.gaDays = Number(d.gaDays || 0);
-          profile.gaRecordedOnMs = recorded;
+          profile.gaRecordedOnMs = now;
           profile.gestationWeeks = profile.gaWeeks;
-          profile.expectedDeliveryDate = toLocalIsoDate(eddFromGestationalAge(profile.gaWeeks, profile.gaDays, recorded));
+          profile.expectedDeliveryDate = toLocalIsoDate(eddFromGestationalAge(profile.gaWeeks, profile.gaDays, now));
         } else {
           delete profile.gaWeeks;
           delete profile.gaDays;
           delete profile.gaRecordedOnMs;
-          opt('expectedDeliveryDate', d.datingMode === 'due' ? d.dueDate : undefined);
-          if (d.datingMode === 'due' && progress) profile.gestationWeeks = progress.weeks;
-          else delete profile.gestationWeeks;
+          profile.expectedDeliveryDate = d.dueDate;
+          if (progress) profile.gestationWeeks = progress.weeks;
         }
       }
 
       await saveProfile(profile);
 
-      // Contacts: update the existing CHP / family entry, or add new ones.
       const contacts = await listContacts();
       let order = Math.max(0, ...contacts.map((c) => c.escalationOrder));
       const upsert = async (role: Contact['role'], name: string, phone: string) => {
@@ -405,8 +450,10 @@ export function RegisterPage() {
       await saveConsent({
         version: 'consent-sw-v2',
         language: lang,
-        agreedAtMs: Date.now(),
+        agreedAtMs: now,
         sharing: { chp: d.shareChp, family: d.shareFamily, nurse: d.shareNurse },
+        termsVersion: TERMS_VERSION,
+        termsAcceptedAtMs: now,
       });
 
       if (d.role === 'nurse' && d.clinicalNote.trim()) {
@@ -427,22 +474,18 @@ export function RegisterPage() {
     }
   }
 
-  // ── Small field helpers ─────────────────────────────────────────────────
-  const err = (k: string) =>
-    errors[k] ? (
-      <p className="field-error" id={`err-${k}`} role="alert">
-        {errors[k]}
-      </p>
-    ) : null;
-  const aria = (k: string) =>
-    errors[k] ? { 'aria-invalid': true as const, 'aria-describedby': `err-${k}` } : {};
-  const why = (en: string, sw: string) => (
+  // ── Small helpers ───────────────────────────────────────────────────────
+  const why = (en: string, s: string) => (
     <p className="reg-why">
-      <span aria-hidden>ⓘ</span> {tx(en, sw)}
+      <span aria-hidden>ⓘ</span> {tx(en, s)}
     </p>
   );
-  const optional = <span className="reg-optional">{tx('optional', 'si lazima')}</span>;
-
+  const optional = tx('optional', 'si lazima');
+  const legend = (
+    <p className="n-legend">
+      <RequiredMark /> {tx('= required', '= lazima')}
+    </p>
+  );
   const pct = Math.round(((stepIdx + 1) / steps.length) * 100);
 
   return (
@@ -457,8 +500,7 @@ export function RegisterPage() {
           <span style={{ width: `${pct}%` }} />
         </div>
         <p className="reg-steps__count">
-          {tx(`Step ${stepIdx + 1} of ${steps.length}`, `Hatua ${stepIdx + 1} kati ya ${steps.length}`)} ·{' '}
-          <strong>{stepLabels[step]}</strong>
+          {tx(`Step ${stepIdx + 1} of ${steps.length}`, `Hatua ${stepIdx + 1} kati ya ${steps.length}`)} · <strong>{stepLabels[step]}</strong>
         </p>
         <ol className="reg-steps__dots">
           {steps.map((s, i) => (
@@ -474,7 +516,7 @@ export function RegisterPage() {
           <>
             <h1 className="screen-title">{tx('Who is filling this in?', 'Nani anajaza fomu hii?')}</h1>
             <p className="screen-sub">{tx('A mother can register herself, or a CHW or nurse can help.', 'Mama anaweza kujisajili, au CHW au muuguzi akasaidia.')}</p>
-            <div className="reg-choices" role="radiogroup">
+            <div className="reg-choices" role="radiogroup" aria-label={tx('Who is registering', 'Nani anasajili')}>
               {(
                 [
                   ['self', tx("I'm the mother", 'Mimi ni mama'), tx('Registering myself', 'Najisajili mwenyewe')],
@@ -482,14 +524,7 @@ export function RegisterPage() {
                   ['nurse', tx("I'm a nurse / midwife", 'Mimi ni muuguzi / mkunga'), tx('Registering at the clinic', 'Nasajili kliniki')],
                 ] as const
               ).map(([role, label, sub]) => (
-                <button
-                  key={role}
-                  type="button"
-                  role="radio"
-                  aria-checked={d.role === role}
-                  className="reg-choice"
-                  onClick={() => set('role', role)}
-                >
+                <button key={role} type="button" role="radio" aria-checked={d.role === role} className="reg-choice" onClick={() => set('role', role)}>
                   <strong>{label}</strong>
                   <span>{sub}</span>
                 </button>
@@ -497,23 +532,16 @@ export function RegisterPage() {
             </div>
             {!self && (
               <>
-                <div className="field">
-                  <label htmlFor="reg-registrar">{tx('Your name', 'Jina lako')}</label>
-                  <input id="reg-registrar" value={d.registrarName} onChange={(e) => set('registrarName', e.target.value)} autoComplete="name" {...aria('registrarName')} />
-                  {err('registrarName')}
-                </div>
-                <div className="field">
-                  <label htmlFor="reg-staffid">
-                    {d.role === 'nurse' ? tx('Staff number', 'Namba ya mfanyakazi') : tx('CHW number', 'Namba ya CHW')} {optional}
-                  </label>
+                {legend}
+                <FormField id="reg-registrar" label={tx('Your name', 'Jina lako')} required error={msg('registrarName')}>
+                  <input id="reg-registrar" value={d.registrarName} onChange={(e) => set('registrarName', e.target.value)} autoComplete="name" {...invalidProps('reg-registrar', msg('registrarName'))} />
+                </FormField>
+                <FormField id="reg-staffid" label={d.role === 'nurse' ? tx('Staff number', 'Namba ya mfanyakazi') : tx('CHW number', 'Namba ya CHW')} optionalText={optional}>
                   <input id="reg-staffid" value={d.registrarId} onChange={(e) => set('registrarId', e.target.value)} />
-                </div>
-                <div className="field">
-                  <label htmlFor="reg-facility">
-                    {tx('Clinic / link facility', 'Kliniki / kituo cha afya')} {optional}
-                  </label>
+                </FormField>
+                <FormField id="reg-facility" label={tx('Clinic / link facility', 'Kliniki / kituo cha afya')} optionalText={optional}>
                   <input id="reg-facility" value={d.facilityName} onChange={(e) => set('facilityName', e.target.value)} />
-                </div>
+                </FormField>
               </>
             )}
           </>
@@ -522,137 +550,132 @@ export function RegisterPage() {
         {step === 'about' && (
           <>
             <h1 className="screen-title">{self ? tx('About you', 'Kuhusu wewe') : tx('About the mother', 'Kuhusu mama')}</h1>
-            <div className="field">
-              <label htmlFor="reg-display">{self ? tx('What should Neema call you?', 'Neema akuite nani?') : tx('What should Neema call her?', 'Neema amwite nani?')}</label>
-              <input id="reg-display" value={d.displayName} onChange={(e) => set('displayName', e.target.value)} placeholder={tx('e.g. Mama Wanjiru', 'mfano: Mama Wanjiru')} {...aria('displayName')} />
-              {err('displayName')}
-            </div>
-            <div className="field">
-              <label htmlFor="reg-full">
-                {yourName} ({tx('full, as on clinic card', 'kamili, kama kwenye kadi')}) {optional}
-              </label>
-              <input id="reg-full" value={d.fullName} onChange={(e) => set('fullName', e.target.value)} autoComplete="name" />
-            </div>
-            <div className="field">
-              <label htmlFor="reg-dob">
-                {tx('Date of birth', 'Tarehe ya kuzaliwa')} {optional}
-              </label>
-              <input id="reg-dob" type="date" value={d.dateOfBirth} max={toLocalIsoDate(nowMs)} onChange={(e) => set('dateOfBirth', e.target.value)} {...aria('dateOfBirth')} />
-              {err('dateOfBirth')}
-              {why('Age helps the nurse read your results. It is not shared in alerts.', 'Umri humsaidia muuguzi kuelewa vipimo. Hautumwi kwenye tahadhari.')}
-            </div>
-            <div className="field">
-              <label htmlFor="reg-phone">
-                {tx('Phone number', 'Namba ya simu')} {optional}
-              </label>
-              <input id="reg-phone" type="tel" inputMode="tel" value={d.phone} onChange={(e) => set('phone', e.target.value)} placeholder="0712 345 678" autoComplete="tel" {...aria('phone')} />
-              {err('phone')}
-              {self
-                ? why('So your CHP can call you back after an alert.', 'Ili CHP wako akupigie baada ya tahadhari.')
-                : why('So her CHP can call her back after an alert.', 'Ili CHP wake ampigie baada ya tahadhari.')}
-            </div>
+            {legend}
+            <FormField id="reg-full" label={self ? tx('Full name', 'Jina kamili') : tx("Mother's full name", 'Jina kamili la mama')} required error={msg('fullName')} hint={tx('As on the clinic card or ID.', 'Kama kwenye kadi ya kliniki au kitambulisho.')}>
+              <input id="reg-full" value={d.fullName} onChange={(e) => set('fullName', e.target.value)} autoComplete="name" {...invalidProps('reg-full', msg('fullName'))} />
+            </FormField>
+            <FormField
+              id="reg-display"
+              label={self ? tx('What should Neema call you?', 'Neema akuite nani?') : tx('What should Neema call her?', 'Neema amwite nani?')}
+              optionalText={optional}
+              hint={tx('Leave empty to use the first name.', 'Acha tupu kutumia jina la kwanza.')}
+            >
+              <input id="reg-display" value={d.displayName} onChange={(e) => set('displayName', e.target.value)} placeholder={tx('e.g. Mama Wanjiru', 'mfano: Mama Wanjiru')} />
+            </FormField>
+            <FormField
+              id="reg-dob"
+              label={tx('Date of birth', 'Tarehe ya kuzaliwa')}
+              optionalText={optional}
+              error={msg('dateOfBirth')}
+              hint={why('Age helps the nurse read results. It is not sent in alerts.', 'Umri humsaidia muuguzi kuelewa vipimo. Hautumwi kwenye tahadhari.')}
+            >
+              <input id="reg-dob" type="date" value={d.dateOfBirth} max={toLocalIsoDate(nowMs)} onChange={(e) => set('dateOfBirth', e.target.value)} {...invalidProps('reg-dob', msg('dateOfBirth'))} />
+            </FormField>
+            <FormField
+              id="reg-phone"
+              label={tx('Phone number', 'Namba ya simu')}
+              required={!self && d.phoneKind === 'basic'}
+              optionalText={optional}
+              error={msg('phone')}
+              hint={self ? why('So your CHP can call you back after an alert.', 'Ili CHP wako akupigie baada ya tahadhari.') : why('So her CHP can call her back after an alert.', 'Ili CHP wake ampigie baada ya tahadhari.')}
+            >
+              <input id="reg-phone" type="tel" inputMode="tel" value={d.phone} onChange={(e) => set('phone', e.target.value)} placeholder="0712 345 678" autoComplete="tel" {...invalidProps('reg-phone', msg('phone'))} />
+            </FormField>
             {!self && (
-              <>
-                <p className="reg-label">{tx('What phone does she have?', 'Ana simu ya aina gani?')}</p>
-                <div className="reg-seg reg-seg--3" role="radiogroup" aria-label={tx('Phone type', 'Aina ya simu')}>
-                  {(
-                    [
-                      ['smartphone', tx('Smartphone', 'Simu janja')],
-                      ['basic', tx('Basic phone', 'Simu ya kawaida')],
-                      ['none', tx('No phone', 'Hana simu')],
-                    ] as const
-                  ).map(([k, label]) => (
-                    <button key={k} type="button" role="radio" aria-checked={d.phoneKind === k} onClick={() => set('phoneKind', k)}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
+              <div className="field">
+                <span className="n-label">{tx('What phone does she have?', 'Ana simu ya aina gani?')}</span>
+                <Segmented
+                  ariaLabel={tx('Phone type', 'Aina ya simu')}
+                  value={d.phoneKind}
+                  onChange={(v) => set('phoneKind', v)}
+                  options={[
+                    { value: 'smartphone', label: tx('Smartphone', 'Simu janja') },
+                    { value: 'basic', label: tx('Basic phone', 'Simu ya kawaida') },
+                    { value: 'none', label: tx('No phone', 'Hana simu') },
+                  ]}
+                />
                 {d.phoneKind !== 'none' ? (
-                  <label className="reg-agree" style={{ marginTop: '0.6rem' }}>
+                  <label className="reg-agree">
                     <input type="checkbox" checked={d.callsConsent} onChange={(e) => set('callsConsent', e.target.checked)} />
-                    <span>
-                      {tx('She agrees to receive automated check-in calls and SMS on this number.', 'Amekubali kupokea simu na SMS za ukaguzi za kiotomatiki kwa namba hii.')}
-                    </span>
+                    <span>{tx('She agrees to receive automated check-in calls and SMS on this number.', 'Amekubali kupokea simu na SMS za ukaguzi za kiotomatiki kwa namba hii.')}</span>
                   </label>
                 ) : null}
-                {why(
-                  'Automated calls are planned and need the Neema server. Saving this now means she is ready when it starts.',
-                  'Simu za kiotomatiki zinapangwa na zinahitaji seva ya Neema. Kuhifadhi sasa kunamtayarisha zitakapoanza.',
-                )}
-              </>
+                {why('Automated calls are planned and need the Neema server. Saving this now means she is ready when it starts.', 'Simu za kiotomatiki zinapangwa na zinahitaji seva ya Neema. Kuhifadhi sasa kunamtayarisha zitakapoanza.')}
+              </div>
             )}
-            <div className="field">
-              <label htmlFor="reg-loc">
-                {tx('Village / estate', 'Kijiji / mtaa')} {optional}
-              </label>
+            <FormField id="reg-loc" label={tx('Village / estate', 'Kijiji / mtaa')} optionalText={optional} hint={self ? why('Helps your CHP find you quickly.', 'Humsaidia CHP kukupata haraka.') : why('Helps the CHP find her quickly.', 'Humsaidia CHP kumpata haraka.')}>
               <input id="reg-loc" value={d.location} onChange={(e) => set('location', e.target.value)} autoComplete="address-level2" />
-              {self ? why('Helps your CHP find you quickly.', 'Humsaidia CHP kukupata haraka.') : why('Helps the CHP find her quickly.', 'Humsaidia CHP kumpata haraka.')}
-            </div>
+            </FormField>
           </>
         )}
 
         {step === 'pregnancy' && (
           <>
             <h1 className="screen-title">{tx('Pregnancy', 'Mimba')}</h1>
-            <div className="reg-seg" role="radiogroup" aria-label={tx('Stage', 'Hatua')}>
-              <button type="button" role="radio" aria-checked={d.stage === 'pregnancy'} onClick={() => set('stage', 'pregnancy')}>
-                {tx('Pregnant now', 'Mjamzito sasa')}
-              </button>
-              <button type="button" role="radio" aria-checked={d.stage === 'postpartum'} onClick={() => set('stage', 'postpartum')}>
-                {tx('Gave birth recently', 'Amejifungua karibuni')}
-              </button>
+            {legend}
+            <div className="field">
+              <span className="n-label">{tx('Stage', 'Hatua')}</span>
+              <Segmented
+                ariaLabel={tx('Stage', 'Hatua')}
+                value={d.stage}
+                onChange={(v) => set('stage', v)}
+                options={[
+                  { value: 'pregnancy', label: tx('Pregnant now', 'Mjamzito sasa') },
+                  { value: 'postpartum', label: tx('Gave birth recently', 'Amejifungua karibuni') },
+                ]}
+              />
             </div>
 
             {d.stage === 'pregnancy' && (
               <>
-                <p className="reg-label">{tx('How far along?', 'Mimba ina muda gani?')}</p>
-                <div className="reg-seg reg-seg--3" role="radiogroup">
-                  {(
-                    [
-                      ['weeks', tx('Weeks', 'Wiki')],
-                      ['due', tx('Due date', 'Tarehe ya kujifungua')],
-                      ['unknown', tx("Don't know", 'Sijui')],
-                    ] as const
-                  ).map(([mode, label]) => (
-                    <button key={mode} type="button" role="radio" aria-checked={d.datingMode === mode} onClick={() => set('datingMode', mode)}>
-                      {label}
-                    </button>
-                  ))}
+                <div className="field">
+                  <span className="n-label" id="reg-ga-label">
+                    {tx('How far along?', 'Mimba ina muda gani?')}
+                    <RequiredMark />
+                  </span>
+                  <Segmented
+                    ariaLabel={tx('How do you know how far along', 'Unajuaje muda wa mimba')}
+                    value={d.datingMode}
+                    onChange={(v) => set('datingMode', v)}
+                    options={[
+                      { value: 'weeks', label: tx('Weeks + days', 'Wiki + siku') },
+                      { value: 'due', label: tx('Due date', 'Tarehe ya kujifungua') },
+                    ]}
+                  />
                 </div>
-                {d.datingMode === 'weeks' && (
-                  <div className="reg-ga">
-                    <div className="field">
-                      <label htmlFor="reg-gaw">{tx('Weeks', 'Wiki')}</label>
-                      <input id="reg-gaw" type="number" inputMode="numeric" min={1} max={42} value={d.gaWeeks} onChange={(e) => set('gaWeeks', e.target.value)} {...aria('gaWeeks')} />
+                {d.datingMode === 'weeks' ? (
+                  <>
+                    <div className="reg-ga">
+                      <div className="field">
+                        <label htmlFor="reg-gaw" className="n-label">
+                          {tx('Weeks', 'Wiki')}
+                          <RequiredMark />
+                        </label>
+                        <input id="reg-gaw" type="number" inputMode="numeric" min={1} max={42} value={d.gaWeeks} onChange={(e) => set('gaWeeks', e.target.value)} {...invalidProps('reg-gaw', msg('gestationalAge'))} />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="reg-gad" className="n-label">
+                          {tx('Days', 'Siku')}
+                        </label>
+                        <select id="reg-gad" value={d.gaDays} onChange={(e) => set('gaDays', e.target.value)}>
+                          {[0, 1, 2, 3, 4, 5, 6].map((n) => (
+                            <option key={n} value={n}>
+                              {n}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
-                    <div className="field">
-                      <label htmlFor="reg-gad">{tx('Days', 'Siku')}</label>
-                      <select id="reg-gad" value={d.gaDays} onChange={(e) => set('gaDays', e.target.value)}>
-                        {[0, 1, 2, 3, 4, 5, 6].map((n) => (
-                          <option key={n} value={n}>
-                            {n}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
+                    {msg('gestationalAge') ? <FieldError id="reg-gaw-error" message={msg('gestationalAge')!} /> : null}
+                  </>
+                ) : (
+                  <FormField id="reg-due" label={tx('Due date (from clinic card)', 'Tarehe ya kujifungua (kadi ya kliniki)')} required error={msg('dueDate')}>
+                    <input id="reg-due" type="date" value={d.dueDate} onChange={(e) => set('dueDate', e.target.value)} {...invalidProps('reg-due', msg('dueDate'))} />
+                  </FormField>
                 )}
-                {err('gaWeeks')}
-                {d.datingMode === 'due' && (
-                  <div className="field">
-                    <label htmlFor="reg-due">{tx('Due date (from clinic card)', 'Tarehe ya kujifungua (kadi ya kliniki)')}</label>
-                    <input id="reg-due" type="date" value={d.dueDate} onChange={(e) => set('dueDate', e.target.value)} {...aria('dueDate')} />
-                    {err('dueDate')}
-                  </div>
-                )}
-                {d.datingMode === 'unknown' && (
-                  <p className="soft-note">
-                    {tx(
-                      'That is okay. Ask at your next clinic visit and add it in Profile. Neema will still watch your readings.',
-                      'Sawa. Uliza kliniki ijayo kisha uiongeze kwenye Wasifu. Neema bado ataangalia vipimo vyako.',
-                    )}
-                  </p>
-                )}
+                <p className="n-hint" style={{ marginTop: '0.4rem' }}>
+                  {tx('Not sure? Ask at the clinic, or look at the clinic card (mother and child booklet).', 'Huna uhakika? Uliza kliniki, au angalia kadi ya kliniki (kitabu cha mama na mtoto).')}
+                </p>
                 {progress && (
                   <p className="reg-calc">
                     {tx(
@@ -661,29 +684,33 @@ export function RegisterPage() {
                     )}
                   </p>
                 )}
-                {why('Neema uses this to show the right advice each week. It moves forward by itself.', 'Neema hutumia hii kuonyesha ushauri sahihi kila wiki. Husonga mbele yenyewe.')}
 
-                <p className="reg-label">{tx('Is this the first pregnancy?', 'Hii ni mimba ya kwanza?')}</p>
-                <div className="reg-seg" role="radiogroup" {...aria('firstPregnancy')} tabIndex={errors.firstPregnancy ? -1 : undefined}>
-                  <button type="button" role="radio" aria-checked={d.firstPregnancy === 'yes'} onClick={() => set('firstPregnancy', 'yes')}>
-                    {tx('Yes', 'Ndiyo')}
-                  </button>
-                  <button type="button" role="radio" aria-checked={d.firstPregnancy === 'no'} onClick={() => set('firstPregnancy', 'no')}>
-                    {tx('No', 'Hapana')}
-                  </button>
+                <div className="field" style={{ marginTop: '1rem' }}>
+                  <span className="n-label">
+                    {tx('Is this the first pregnancy?', 'Hii ni mimba ya kwanza?')}
+                    <RequiredMark />
+                  </span>
+                  <Segmented
+                    ariaLabel={tx('First pregnancy', 'Mimba ya kwanza')}
+                    value={d.firstPregnancy}
+                    onChange={(v) => set('firstPregnancy', v)}
+                    invalid={Boolean(msg('firstPregnancy'))}
+                    describedBy={msg('firstPregnancy') ? 'reg-first-error' : undefined}
+                    options={[
+                      { value: 'yes', label: tx('Yes', 'Ndiyo') },
+                      { value: 'no', label: tx('No', 'Hapana') },
+                    ]}
+                  />
+                  {msg('firstPregnancy') ? <FieldError id="reg-first-error" message={msg('firstPregnancy')!} /> : null}
                 </div>
-                {err('firstPregnancy')}
                 {d.firstPregnancy === 'no' && (
                   <>
-                    <div className="field" style={{ marginTop: '0.8rem' }}>
-                      <label htmlFor="reg-prev">
-                        {tx('How many pregnancies before?', 'Mimba ngapi kabla?')} {optional}
-                      </label>
-                      <input id="reg-prev" type="number" inputMode="numeric" min={1} max={20} value={d.previousPregnancies} onChange={(e) => set('previousPregnancies', e.target.value)} {...aria('previousPregnancies')} />
-                      {err('previousPregnancies')}
-                    </div>
-                    <p className="reg-label">
-                      {tx('Any of these in past pregnancies?', 'Yoyote kati ya haya kwenye mimba zilizopita?')} {optional}
+                    <FormField id="reg-prev" label={tx('How many pregnancies before?', 'Mimba ngapi kabla?')} optionalText={optional} error={msg('previousPregnancies')}>
+                      <input id="reg-prev" type="number" inputMode="numeric" min={1} max={20} value={d.previousPregnancies} onChange={(e) => set('previousPregnancies', e.target.value)} {...invalidProps('reg-prev', msg('previousPregnancies'))} />
+                    </FormField>
+                    <p className="n-label">
+                      {tx('Any of these in past pregnancies?', 'Yoyote kati ya haya kwenye mimba zilizopita?')}
+                      <span className="n-optional">{optional}</span>
                     </p>
                     <div className="chip-grid">
                       {COMPLICATIONS.map((c) => (
@@ -692,7 +719,7 @@ export function RegisterPage() {
                         </button>
                       ))}
                     </div>
-                    {why('Past problems help the nurse plan your care. They do not change your alerts.', 'Matatizo ya zamani humsaidia muuguzi kupanga huduma. Hayabadilishi tahadhari.')}
+                    {why('Past problems help the nurse plan care. They do not change alerts.', 'Matatizo ya zamani humsaidia muuguzi kupanga huduma. Hayabadilishi tahadhari.')}
                   </>
                 )}
               </>
@@ -704,7 +731,7 @@ export function RegisterPage() {
           <>
             <h1 className="screen-title">{tx('Health notes', 'Maelezo ya afya')}</h1>
             <p className="screen-sub">{tx('All optional. Skip anything you are not sure about.', 'Yote si lazima. Ruka usichokuwa na uhakika nacho.')}</p>
-            <p className="reg-label">{tx('Ongoing conditions', 'Magonjwa ya muda mrefu')}</p>
+            <p className="n-label">{tx('Ongoing conditions', 'Magonjwa ya muda mrefu')}</p>
             <div className="chip-grid">
               {CONDITIONS.map((c) => (
                 <button key={c.key} type="button" className="chip" aria-pressed={d.conditions.includes(c.key)} onClick={() => toggleIn('conditions', c.key)}>
@@ -712,22 +739,16 @@ export function RegisterPage() {
                 </button>
               ))}
             </div>
-            <div className="field" style={{ marginTop: '0.8rem' }}>
-              <label htmlFor="reg-other">{tx('Other condition', 'Ugonjwa mwingine')}</label>
+            <FormField id="reg-other" label={tx('Other condition', 'Ugonjwa mwingine')}>
               <input id="reg-other" value={d.otherCondition} onChange={(e) => set('otherCondition', e.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor="reg-allergy">{tx('Allergies (separate with commas)', 'Mzio (tenganisha kwa koma)')}</label>
-              <input id="reg-allergy" value={d.allergies} onChange={(e) => set('allergies', e.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor="reg-meds">{tx('Medicines taken now', 'Dawa unazotumia sasa')}</label>
+            </FormField>
+            <AllergyPicker idPrefix="reg-alg" lang={lang} value={d.allergies} onChange={(v) => set('allergies', v)} error={msg('allergies')} />
+            <FormField id="reg-meds" label={tx('Medicines taken now', 'Dawa unazotumia sasa')}>
               <input id="reg-meds" value={d.medications} onChange={(e) => set('medications', e.target.value)} placeholder={tx('e.g. iron, folic acid', 'mfano: madini ya chuma, foliki')} />
-            </div>
-            <div className="field">
-              <label htmlFor="reg-notes">{self ? tx('Anything else you want your nurse to know', 'Lolote unalotaka muuguzi ajue') : tx("Mother's own notes", 'Maelezo ya mama mwenyewe')}</label>
+            </FormField>
+            <FormField id="reg-notes" label={self ? tx('Anything else your nurse should know', 'Lolote muuguzi anapaswa kujua') : tx("Mother's own notes", 'Maelezo ya mama mwenyewe')}>
               <textarea id="reg-notes" rows={3} value={d.healthNotes} onChange={(e) => set('healthNotes', e.target.value)} />
-            </div>
+            </FormField>
             {why('This shows on the nurse summary at clinic visits. It stays on this phone.', 'Huonekana kwenye muhtasari wa muuguzi kliniki. Hubaki kwenye simu hii.')}
           </>
         )}
@@ -738,31 +759,23 @@ export function RegisterPage() {
             <p className="screen-sub">{tx('When readings look dangerous, Neema sends an SMS to these people.', 'Vipimo vikionyesha hatari, Neema hutuma SMS kwa watu hawa.')}</p>
             <fieldset className="reg-group">
               <legend>{tx('Community health promoter (CHP)', 'Mhudumu wa afya ya jamii (CHP)')}</legend>
-              <div className="field">
-                <label htmlFor="reg-chpn">{tx('Name', 'Jina')}</label>
-                <input id="reg-chpn" value={d.chpName} onChange={(e) => set('chpName', e.target.value)} {...aria('chpName')} />
-                {err('chpName')}
-              </div>
-              <div className="field">
-                <label htmlFor="reg-chpp">{tx('Phone', 'Simu')}</label>
-                <input id="reg-chpp" type="tel" inputMode="tel" value={d.chpPhone} onChange={(e) => set('chpPhone', e.target.value)} placeholder="0712 345 678" {...aria('chpPhone')} />
-                {err('chpPhone')}
-              </div>
+              <FormField id="reg-chpn" label={tx('Name', 'Jina')} error={msg('chpName')}>
+                <input id="reg-chpn" value={d.chpName} onChange={(e) => set('chpName', e.target.value)} {...invalidProps('reg-chpn', msg('chpName'))} />
+              </FormField>
+              <FormField id="reg-chpp" label={tx('Phone', 'Simu')} error={msg('chpPhone')}>
+                <input id="reg-chpp" type="tel" inputMode="tel" value={d.chpPhone} onChange={(e) => set('chpPhone', e.target.value)} placeholder="0712 345 678" {...invalidProps('reg-chpp', msg('chpPhone'))} />
+              </FormField>
             </fieldset>
             <fieldset className="reg-group">
               <legend>
-                {tx('Family member', 'Mwanafamilia')} {optional}
+                {tx('Family member', 'Mwanafamilia')} <span className="n-optional">{optional}</span>
               </legend>
-              <div className="field">
-                <label htmlFor="reg-famn">{tx('Name', 'Jina')}</label>
-                <input id="reg-famn" value={d.familyName} onChange={(e) => set('familyName', e.target.value)} {...aria('familyName')} />
-                {err('familyName')}
-              </div>
-              <div className="field">
-                <label htmlFor="reg-famp">{tx('Phone', 'Simu')}</label>
-                <input id="reg-famp" type="tel" inputMode="tel" value={d.familyPhone} onChange={(e) => set('familyPhone', e.target.value)} placeholder="0712 345 678" {...aria('familyPhone')} />
-                {err('familyPhone')}
-              </div>
+              <FormField id="reg-famn" label={tx('Name', 'Jina')} error={msg('familyName')}>
+                <input id="reg-famn" value={d.familyName} onChange={(e) => set('familyName', e.target.value)} {...invalidProps('reg-famn', msg('familyName'))} />
+              </FormField>
+              <FormField id="reg-famp" label={tx('Phone', 'Simu')} error={msg('familyPhone')}>
+                <input id="reg-famp" type="tel" inputMode="tel" value={d.familyPhone} onChange={(e) => set('familyPhone', e.target.value)} placeholder="0712 345 678" {...invalidProps('reg-famp', msg('familyPhone'))} />
+              </FormField>
             </fieldset>
             {!d.chpPhone.trim() && (
               <p className="soft-note reg-warn" role="status">
@@ -784,31 +797,26 @@ export function RegisterPage() {
                 'Kwa muuguzi tu. Mama anaweza kusoma maelezo haya lakini hawezi kuyabadilisha. Yanawekwa mbali na maelezo yake.',
               )}
             </p>
-            <div className="field">
-              <label htmlFor="reg-clin">
-                {tx('Note', 'Maelezo')} {optional}
-              </label>
-              <textarea id="reg-clin" rows={5} value={d.clinicalNote} onChange={(e) => set('clinicalNote', e.target.value)} {...aria('clinicalNote')} />
-              {err('clinicalNote')}
-            </div>
-            <p className="reg-why">
-              {tx(`Signed as: ${d.registrarName || '—'} (nurse)`, `Imesainiwa na: ${d.registrarName || '—'} (muuguzi)`)}
-            </p>
+            <FormField id="reg-clin" label={tx('Note', 'Maelezo')} optionalText={optional} hint={tx(`Signed as: ${d.registrarName || '—'} (nurse)`, `Imesainiwa na: ${d.registrarName || '—'} (muuguzi)`)}>
+              <textarea id="reg-clin" rows={5} value={d.clinicalNote} onChange={(e) => set('clinicalNote', e.target.value)} />
+            </FormField>
           </>
         )}
 
         {step === 'consent' && (
           <>
-            <h1 className="screen-title">{tx('Privacy and consent', 'Faragha na idhini')}</h1>
+            <h1 className="screen-title">{tx('Terms and privacy', 'Masharti na faragha')}</h1>
+            {legend}
             <ul className="reg-facts">
               <li>{tx('Everything is saved on this phone only. There is no online account.', 'Kila kitu kinahifadhiwa kwenye simu hii tu. Hakuna akaunti ya mtandaoni.')}</li>
-              <li>{tx('When readings look dangerous, a short SMS goes to the people chosen below.', 'Vipimo vikionyesha hatari, SMS fupi hutumwa kwa watu uliowachagua hapa chini.')}</li>
-              <li>{tx('If you use voice or chat, those words are sent online to be answered. Readings are not.', 'Ukitumia sauti au gumzo, maneno hayo hutumwa mtandaoni kujibiwa. Vipimo havitumwi.')}</li>
-              <li>{tx('Neema does not diagnose. Your nurse and CHP make care decisions.', 'Neema hatambui ugonjwa. Muuguzi na CHP ndio huamua huduma.')}</li>
-              <li>{tx('You can change these choices or delete your data in Profile.', 'Unaweza kubadilisha haya au kufuta data yako kwenye Wasifu.')}</li>
+              <li>{tx('When readings look dangerous, a short SMS goes to the people chosen below.', 'Vipimo vikionyesha hatari, SMS fupi hutumwa kwa watu waliochaguliwa hapa chini.')}</li>
+              <li>{tx('Neema does not diagnose. In an emergency call 999.', 'Neema hatambui ugonjwa. Wakati wa dharura piga 999.')}</li>
             </ul>
-            <p className="reg-label">{tx('Who may receive an alert?', 'Nani apokee tahadhari?')}</p>
-            <div className="panel">
+            <p className="n-label" style={{ marginTop: '1rem' }}>
+              {tx('Who may receive an alert?', 'Nani apokee tahadhari?')}
+              <RequiredMark />
+            </p>
+            <div className="panel" aria-invalid={msg('sharing') ? true : undefined} tabIndex={msg('sharing') ? -1 : undefined}>
               {(
                 [
                   ['shareChp', tx('Community health promoter (CHP)', 'Mhudumu wa afya ya jamii (CHP)')],
@@ -822,16 +830,29 @@ export function RegisterPage() {
                 </label>
               ))}
             </div>
-            {err('shareChp')}
-            <label className="reg-agree">
-              <input type="checkbox" checked={d.agreed} onChange={(e) => set('agreed', e.target.checked)} {...aria('agreed')} />
-              <span>
-                {self
-                  ? tx('I have read this and I agree.', 'Nimesoma haya na ninakubali.')
-                  : tx('I explained this to the mother and she agrees.', 'Nimemweleza mama haya na amekubali.')}
-              </span>
-            </label>
-            {err('agreed')}
+            {msg('sharing') ? <FieldError id="reg-sharing-error" message={msg('sharing')!} /> : null}
+
+            <div className="reg-terms" data-invalid={msg('terms') ? 'true' : undefined}>
+              <label className="reg-agree" htmlFor="reg-terms">
+                <input
+                  id="reg-terms"
+                  type="checkbox"
+                  checked={d.termsAccepted}
+                  onChange={(e) => set('termsAccepted', e.target.checked)}
+                  {...invalidProps('reg-terms', msg('terms'))}
+                />
+                <span>
+                  {self
+                    ? tx('I have read and accept the Terms and Conditions', 'Nimesoma na nakubali Masharti na Vigezo')
+                    : tx('I read the Terms and Conditions to the mother and she accepts them', 'Nimemsomea mama Masharti na Vigezo na amekubali')}
+                  <RequiredMark />
+                </span>
+              </label>
+              <button type="button" className="n-link" onClick={() => setShowTerms(true)} aria-haspopup="dialog">
+                {tx('Read the Terms and Conditions', 'Soma Masharti na Vigezo')}
+              </button>
+              {msg('terms') ? <FieldError id="reg-terms-error" message={msg('terms')!} /> : null}
+            </div>
           </>
         )}
 
@@ -840,9 +861,10 @@ export function RegisterPage() {
             <h1 className="screen-title">{tx('Check and finish', 'Hakiki na umalize')}</h1>
             <p className="screen-sub">{tx('Tap Edit to fix anything.', 'Gusa Badilisha kurekebisha.')}</p>
             <ReviewBlock title={stepLabels.about} onEdit={() => goTo('about')} editLabel={tx('Edit', 'Badilisha')}>
-              <Row k={tx('Name', 'Jina')} v={[d.displayName, d.fullName && `(${d.fullName})`].filter(Boolean).join(' ')} />
+              <Row k={tx('Full name', 'Jina kamili')} v={d.fullName} />
+              <Row k={tx('Neema calls', 'Neema humwita')} v={d.displayName || d.fullName.trim().split(/\s+/)[0]} />
               <Row k={tx('Born', 'Alizaliwa')} v={d.dateOfBirth} />
-              <Row k={tx('Phone', 'Simu')} v={d.phone ? normalizePhone(d.phone) ?? d.phone : ''} />
+              <Row k={tx('Phone', 'Simu')} v={d.phone ? (normalizePhone(d.phone) ?? d.phone) : ''} />
               <Row k={tx('Place', 'Mahali')} v={d.location} />
               {!self ? (
                 <Row
@@ -856,10 +878,7 @@ export function RegisterPage() {
                 <Row k={tx('Stage', 'Hatua')} v={tx('Gave birth recently', 'Amejifungua karibuni')} />
               ) : (
                 <>
-                  <Row
-                    k={tx('Today', 'Leo')}
-                    v={progress ? tx(`${progress.weeks} w ${progress.days} d · trimester ${progress.trimester}`, `wiki ${progress.weeks} siku ${progress.days} · kipindi ${progress.trimester}`) : tx('Not known yet', 'Bado haijulikani')}
-                  />
+                  <Row k={tx('Today', 'Leo')} v={progress ? tx(`${progress.weeks} w ${progress.days} d · trimester ${progress.trimester}`, `wiki ${progress.weeks} siku ${progress.days} · kipindi ${progress.trimester}`) : ''} />
                   <Row k={tx('Due', 'Kujifungua')} v={progress ? fmtDate(progress.eddMs) : ''} />
                   <Row k={tx('First pregnancy', 'Mimba ya kwanza')} v={d.firstPregnancy === 'yes' ? tx('Yes', 'Ndiyo') : d.firstPregnancy === 'no' ? tx('No', 'Hapana') : ''} />
                   <Row
@@ -874,12 +893,12 @@ export function RegisterPage() {
                 k={tx('Conditions', 'Magonjwa')}
                 v={[...d.conditions.map((k) => CONDITIONS.find((c) => c.key === k)).filter(Boolean).map((c) => tx(c!.en, c!.sw)), d.otherCondition.trim()].filter(Boolean).join(', ')}
               />
-              <Row k={tx('Allergies', 'Mzio')} v={d.allergies} />
+              <Row
+                k={tx('Allergies', 'Mzio')}
+                v={d.allergies.noneKnown ? tx('No known allergies', 'Hakuna mzio unaojulikana') : d.allergies.items.map((e) => allergyLabel(e, lang)).join(' · ') || tx('Not answered', 'Haijajibiwa')}
+              />
               <Row k={tx('Medicines', 'Dawa')} v={d.medications} />
               <Row k={tx('Notes', 'Maelezo')} v={d.healthNotes} />
-              {!d.conditions.length && !d.otherCondition.trim() && !d.allergies.trim() && !d.medications.trim() && !d.healthNotes.trim() && (
-                <Row k="—" v={tx('Nothing added', 'Hakuna kilichoongezwa')} />
-              )}
             </ReviewBlock>
             <ReviewBlock title={stepLabels.contacts} onEdit={() => goTo('contacts')} editLabel={tx('Edit', 'Badilisha')}>
               <Row k="CHP" v={d.chpName ? `${d.chpName} · ${normalizePhone(d.chpPhone) ?? d.chpPhone}` : ''} warn={!d.chpPhone.trim() ? tx('Missing: alerts will reach nobody', 'Haipo: tahadhari haitamfikia mtu') : undefined} />
@@ -890,7 +909,8 @@ export function RegisterPage() {
                 <Row k={tx('Note', 'Maelezo')} v={d.clinicalNote} />
               </ReviewBlock>
             )}
-            <ReviewBlock title={stepLabels.who} onEdit={() => goTo('who')} editLabel={tx('Edit', 'Badilisha')}>
+            <ReviewBlock title={stepLabels.consent} onEdit={() => goTo('consent')} editLabel={tx('Edit', 'Badilisha')}>
+              <Row k={tx('Terms', 'Masharti')} v={d.termsAccepted ? tx('Accepted', 'Yamekubaliwa') : ''} warn={!d.termsAccepted ? tx('Not accepted yet', 'Bado hayajakubaliwa') : undefined} />
               <Row
                 k={tx('Registered by', 'Amesajiliwa na')}
                 v={self ? tx('The mother herself', 'Mama mwenyewe') : `${d.registrarName} (${d.role === 'nurse' ? tx('nurse', 'muuguzi') : 'CHW'})`}
@@ -908,19 +928,40 @@ export function RegisterPage() {
       </section>
 
       <div className="reg-actions">
-        <Button variant="ghost" onClick={back} disabled={busy}>
+        <button type="button" className="btn btn-secondary" onClick={back} disabled={busy}>
           {tx('Back', 'Rudi')}
-        </Button>
+        </button>
         {step === 'review' ? (
-          <Button variant="primary" onClick={() => void finish()} disabled={busy}>
+          <button type="button" className="btn btn-primary" onClick={() => void finish()} disabled={busy}>
             {busy ? tx('Saving…', 'Inahifadhi…') : tx('Finish', 'Maliza')}
-          </Button>
+          </button>
         ) : (
-          <Button variant="primary" onClick={next}>
+          <button type="button" className="btn btn-primary" onClick={next}>
             {step === 'health' || step === 'clinical' ? tx('Next (or skip)', 'Endelea (au ruka)') : tx('Next', 'Endelea')}
-          </Button>
+          </button>
         )}
       </div>
+
+      {showTerms ? (
+        <div
+          className="n-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="terms-title"
+          onClick={() => setShowTerms(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setShowTerms(false);
+          }}
+        >
+          <div className="n-modal__panel" onClick={(e) => e.stopPropagation()}>
+            <h2 id="terms-title">{tx('Terms and Conditions', 'Masharti na Vigezo')}</h2>
+            <TermsContent lang={lang} />
+            <button type="button" className="btn btn-primary btn-block" autoFocus onClick={() => setShowTerms(false)}>
+              {tx('Close', 'Funga')}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
@@ -930,7 +971,7 @@ function ReviewBlock({ title, onEdit, editLabel, children }: { title: string; on
     <div className="reg-review">
       <div className="reg-review__head">
         <h2>{title}</h2>
-        <button type="button" className="reg-review__edit" onClick={onEdit}>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={onEdit}>
           {editLabel}
         </button>
       </div>

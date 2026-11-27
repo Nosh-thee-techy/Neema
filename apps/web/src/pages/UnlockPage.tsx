@@ -167,7 +167,7 @@ export function UnlockPage() {
           {mode === 'set' ? (
             <button
               type="button"
-              className="auth-card__switch"
+              className="btn btn-ghost btn-sm btn-block"
               onClick={() => {
                 setLength((n) => (n === 4 ? 6 : 4));
                 reset(null);
@@ -177,14 +177,14 @@ export function UnlockPage() {
             </button>
           ) : null}
           {changing ? (
-            <button type="button" className="auth-card__switch" onClick={() => nav('/profile#account')}>
+            <button type="button" className="btn btn-ghost btn-sm btn-block" onClick={() => nav('/profile#account')}>
               {tx('Cancel', 'Ghairi')}
             </button>
           ) : null}
           {mode === 'confirm' ? (
             <button
               type="button"
-              className="auth-card__switch"
+              className="btn btn-ghost btn-sm btn-block"
               onClick={() => {
                 setMode('set');
                 setFirstPin('');
