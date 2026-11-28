@@ -33,6 +33,8 @@ export interface TodaySnapshot {
   /** Up to the last 7 recovery check-ins, newest first. */
   recoveryCheckins: RecoveryCheckinRow[];
   recoveryCheckinToday: boolean;
+  /** False until the first read of this phone's store has finished. */
+  loaded: boolean;
 }
 
 const EMPTY: TodaySnapshot = {
@@ -52,6 +54,7 @@ const EMPTY: TodaySnapshot = {
   babies: [],
   recoveryCheckins: [],
   recoveryCheckinToday: false,
+  loaded: false,
 };
 
 function startOfLocalDay(nowMs: number): number {
@@ -100,8 +103,11 @@ export function useToday(refreshKey: unknown): TodaySnapshot {
         symptomsToday: Boolean(lastSymptom && lastSymptom.tsMs >= dayStart),
         hasRealChp: contacts.hasRealChp,
         placeholderContacts: contacts.placeholders.length,
+        loaded: true,
       });
-    })();
+    })().catch(() => {
+      if (!cancelled) setSnapshot((prev) => ({ ...prev, loaded: true }));
+    });
     return () => {
       cancelled = true;
     };

@@ -30,7 +30,9 @@ export function InsightsPage() {
     <main className="screen hist insights">
       <h1 className="screen-title">{postpartum ? tx('Recovery and baby', 'Kupona na mtoto') : tx('Your pregnancy, week by week', 'Mimba yako, wiki kwa wiki')}</h1>
 
-      {postpartum ? (
+      {!today.loaded ? (
+        <p className="hist-empty">{tx('Opening your weeks…', 'Inafungua wiki zako…')}</p>
+      ) : postpartum ? (
         today.recovery ? (
           <>
             {showBaby ? (
@@ -65,7 +67,7 @@ export function InsightsPage() {
             {tx('Add birth details', 'Ongeza maelezo ya kujifungua')}
           </button>
         )
-      ) : today.stage === null ? null : (
+      ) : (
         <PregnancyExplorer key={today.pregnancy?.weeks ?? 'none'} week={today.pregnancy?.weeks ?? null} days={today.pregnancy?.days ?? 0} lang={lang} />
       )}
     </main>
@@ -103,6 +105,14 @@ function PregnancyExplorer({ week, days, lang }: { week: number | null; days: nu
           {tx('Later', 'Baadaye')} ›
         </button>
       </div>
+      {week === null ? (
+        <p className="hist-empty">
+          {tx(
+            'Your own week shows here once it is saved on this phone. You can still read every week.',
+            'Wiki yako itaonekana hapa ikishahifadhiwa kwenye simu hii. Bado unaweza kusoma kila wiki.',
+          )}
+        </p>
+      ) : null}
       <div className="ins-art">
         <BabyStageArt week={showWeek} label={tx(`Illustration of a baby at about ${showWeek} weeks (not to scale)`, `Mchoro wa mtoto wa karibu wiki ${showWeek}`)} />
       </div>
