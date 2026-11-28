@@ -1,19 +1,20 @@
 /**
- * Tap-to-place body map. Regions map to the same SymptomCode vocabulary via REGION_TO_SYMPTOM.
+ * Tap-to-place body map. A woman seen from the front, not a skeleton.
+ * Regions map to the same SymptomCode vocabulary via REGION_TO_SYMPTOM.
  * Regions that only map to `other` track their own visual state so they do not all light up together.
  */
 
 import { useState } from 'react';
 import { REGION_TO_SYMPTOM, type BodyRegion, type SymptomCode } from '@neema/core';
 
-const REGIONS: { id: BodyRegion; labelEn: string; labelSw: string; cx: number; cy: number; r: number }[] = [
-  { id: 'head', labelEn: 'Head', labelSw: 'Kichwa', cx: 50, cy: 14, r: 11 },
-  { id: 'face_hands', labelEn: 'Face / hands', labelSw: 'Uso / mikono', cx: 18, cy: 42, r: 9 },
-  { id: 'breast', labelEn: 'Chest', labelSw: 'Kifua', cx: 50, cy: 36, r: 10 },
-  { id: 'upper_abdomen', labelEn: 'Upper belly', labelSw: 'Tumbo juu', cx: 50, cy: 52, r: 10 },
-  { id: 'lower_abdomen', labelEn: 'Lower belly', labelSw: 'Tumbo chini', cx: 50, cy: 68, r: 10 },
-  { id: 'wound', labelEn: 'Wound area', labelSw: 'Jeraha', cx: 82, cy: 58, r: 9 },
-  { id: 'calf', labelEn: 'Calf / leg', labelSw: 'Mguu', cx: 42, cy: 90, r: 9 },
+const REGIONS: { id: BodyRegion; labelEn: string; labelSw: string; d: string; lx: number; ly: number }[] = [
+  { id: 'head', labelEn: 'Head', labelSw: 'Kichwa', d: 'M70 18 a16 18 0 1 1 0.1 0', lx: 108, ly: 36 },
+  { id: 'face_hands', labelEn: 'Hands', labelSw: 'Mikono', d: 'M18 118 a10 12 0 1 1 0.1 0 M122 118 a10 12 0 1 1 0.1 0', lx: 12, ly: 108 },
+  { id: 'breast', labelEn: 'Chest', labelSw: 'Kifua', d: 'M48 92 h44 a8 10 0 0 1 0 20 h-44 a8 10 0 0 1 0-20', lx: 108, ly: 104 },
+  { id: 'upper_abdomen', labelEn: 'Upper belly', labelSw: 'Tumbo juu', d: 'M50 118 h40 a6 8 0 0 1 0 16 h-40 a6 8 0 0 1 0-16', lx: 108, ly: 128 },
+  { id: 'lower_abdomen', labelEn: 'Lower belly', labelSw: 'Tumbo chini', d: 'M46 140 h48 a16 18 0 0 1 0 32 h-48 a16 18 0 0 1 0-32', lx: 108, ly: 158 },
+  { id: 'wound', labelEn: 'Side', labelSw: 'Upande', d: 'M96 150 a8 10 0 1 1 0.1 0', lx: 112, ly: 176 },
+  { id: 'calf', labelEn: 'Leg', labelSw: 'Mguu', d: 'M52 210 h14 v28 h-14 z M74 210 h14 v28 h-14 z', lx: 108, ly: 226 },
 ];
 
 function isOtherOnly(id: BodyRegion): boolean {
@@ -21,7 +22,7 @@ function isOtherOnly(id: BodyRegion): boolean {
   return codes.length === 1 && codes[0] === 'other';
 }
 
-/** Interactive body silhouette. Tapping a region adds its mapped symptom codes. */
+/** Interactive woman. Tapping a place adds its mapped symptom codes. */
 export function BodyMap({
   selected,
   onToggleCodes,
@@ -48,7 +49,6 @@ export function BodyMap({
         else next.add(id);
         const stillNeedsOther = next.size > 0;
         const otherOn = selected.includes('other');
-        // Keep SymptomCode `other` in sync with whether any other-only region is lit.
         if (stillNeedsOther && !otherOn) onToggleCodes(['other']);
         if (!stillNeedsOther && otherOn) onToggleCodes(['other']);
         return next;
@@ -60,18 +60,43 @@ export function BodyMap({
 
   return (
     <div className="body-map">
-      <svg viewBox="0 0 100 110" className="body-map__svg" role="group" aria-label={lang === 'sw' ? 'Ramani ya mwili' : 'Body map'}>
-        <ellipse cx="50" cy="14" rx="12" ry="13" className="body-map__silhouette" />
+      <svg viewBox="0 0 140 260" className="body-map__svg" role="group" aria-label={lang === 'sw' ? 'Ramani ya mwili' : 'Body map'}>
+        <ellipse cx="70" cy="248" rx="46" ry="6" className="body-map__shadow" />
         <path
-          d="M38 28 Q50 26 62 28 L68 48 Q70 70 62 88 L55 105 L45 105 L38 88 Q30 70 32 48 Z"
           className="body-map__silhouette"
+          d="M70 22
+             C58 22 50 32 50 44
+             C50 54 56 62 62 66
+             L58 74
+             C40 78 28 96 26 118
+             L18 150
+             C16 158 22 162 28 158
+             L36 132
+             L40 150
+             C44 168 48 190 50 210
+             L46 248
+             L62 248
+             L66 214
+             L74 214
+             L78 248
+             L94 248
+             L90 210
+             C92 190 96 168 100 150
+             L104 132
+             L112 158
+             C118 162 124 158 122 150
+             L114 118
+             C112 96 100 78 82 74
+             L78 66
+             C84 62 90 54 90 44
+             C90 32 82 22 70 22 Z"
         />
+        <path className="body-map__hair" d="M50 40 C48 18 92 16 92 42 C86 28 74 24 70 24 C60 24 52 30 50 40 Z" />
+        <ellipse cx="70" cy="148" rx="22" ry="16" className="body-map__belly" />
         {REGIONS.map((r) => (
           <g key={r.id}>
-            <circle
-              cx={r.cx}
-              cy={r.cy}
-              r={r.r}
+            <path
+              d={r.d}
               className="body-map__hit"
               data-on={regionActive(r.id)}
               role="button"
@@ -86,16 +111,16 @@ export function BodyMap({
                 }
               }}
             />
-            <text x={r.cx} y={r.cy + 1} textAnchor="middle" className="body-map__label">
-              {(lang === 'sw' ? r.labelSw : r.labelEn).split(' ')[0]}
+            <text x={r.lx} y={r.ly} className="body-map__label">
+              {lang === 'sw' ? r.labelSw : r.labelEn}
             </text>
           </g>
         ))}
       </svg>
       <p className="soft-note" style={{ margin: '0.5rem 0 0' }}>
         {lang === 'sw'
-          ? 'Gusa sehemu ya mwili — inachagua dalili zile zile. Sehemu bila kanuni maalum huchagua “Nyingine”.'
-          : 'Tap a body area — it picks the same symptom codes. Areas without a dedicated rule select “Other”.'}
+          ? 'Gusa panapokusumbua, hata tumbo la chini. Neema ataweka alama kwenye orodha.'
+          : 'Tap where it bothers you, including the lower belly. Neema ticks the matching feeling in the list.'}
       </p>
     </div>
   );
