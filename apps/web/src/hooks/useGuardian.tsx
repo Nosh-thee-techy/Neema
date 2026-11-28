@@ -169,6 +169,8 @@ interface GuardianState {
   playDemo: (step: DemoStep) => Promise<TriageResult | null>;
   /** Demo mode: clear readings and alerts and return to a calm band. */
   resetDemo: () => Promise<void>;
+  /** Drop a scripted stage override and triage from the saved passport. */
+  syncFromProfile: () => Promise<TriageResult | null>;
   clearPendingSms: () => void;
   clearError: () => void;
   openPendingSms: () => void;
@@ -780,6 +782,28 @@ export function GuardianProvider({ children }: { children: ReactNode }) {
         }
         setLastChainNote(null);
         await refreshTriage(false);
+      },
+      async syncFromProfile() {
+        stageOverrideRef.current = null;
+        setDemoStep(null);
+        saveDemo(null);
+        escalationRef.current?.stop();
+        escalationRef.current = null;
+        recheckRef.current.cancel();
+        setRecheck(recheckRef.current.getState());
+        setRecheckDueInSec(null);
+        setActiveAlertId(null);
+        setPendingSms([]);
+        setChpReply(null);
+        setEscalationNotice(null);
+        setEscalationDueInSec(null);
+        setAlertBody(null);
+        alertBodyRef.current = null;
+        setRedAcknowledged(false);
+        ackRef.current = null;
+        lastLevel.current = null;
+        setLastChainNote(null);
+        return refreshTriage(false);
       },
       clearPendingSms() {
         setPendingSms([]);

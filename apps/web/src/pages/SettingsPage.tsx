@@ -12,6 +12,8 @@ import { undoDelivery } from '../services/delivery';
 import { isQuietWhenOut, setQuietWhenOut } from '../services/quietMode';
 import { lockSession } from '../services/auth';
 import { db, type ConsentRow } from '../storage/db';
+import { activateDemoMother, activeDemoMother, type DemoMotherId } from '../services/demoMothers';
+import { demoToolsAllowed } from '../services/demoPlayer';
 
 /**
  * Settings: who she is (View profile), what Neema is tracking (pregnancy or after birth),
@@ -30,6 +32,10 @@ export function SettingsPage() {
   const [hasChp, setHasChp] = useState<boolean | null>(null);
   const [confirm, setConfirm] = useState<null | 'pregnancy' | 'delete'>(null);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [demoOk, setDemoOk] = useState(false);
+  const [demoMother, setDemoMother] = useState<DemoMotherId | null>(null);
+  const [switching, setSwitching] = useState<DemoMotherId | null>(null);
+  const [switchError, setSwitchError] = useState<string | null>(null);
   const taps = useRef<number[]>([]);
 
   async function reload() {
@@ -37,11 +43,33 @@ export function SettingsPage() {
     setProfile(p);
     setConsent(c);
     setHasChp(contacts.some((x) => x.role === 'chp' && !isPlaceholderPhone(x.phone)));
+    setDemoMother(activeDemoMother());
+    setQuietOut(isQuietWhenOut());
   }
 
   useEffect(() => {
     void reload();
+    void demoToolsAllowed().then(setDemoOk).catch(() => setDemoOk(false));
   }, []);
+
+  async function pickMother(id: DemoMotherId) {
+    if (switching) return;
+    setSwitching(id);
+    setSwitchError(null);
+    try {
+      await activateDemoMother(id);
+      if (!g.connected) await g.connectSimulator();
+      await g.syncFromProfile();
+      setDemoMother(id);
+      setQuietOut(isQuietWhenOut());
+      await reload();
+      nav('/home');
+    } catch (err) {
+      setSwitchError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSwitching(null);
+    }
+  }
 
   const after = profile?.stage === 'postpartum';
   const name = profile?.displayName || tx('Mama', 'Mama');
@@ -139,6 +167,53 @@ export function SettingsPage() {
           <strong className="home-alert__title">{tx('No CHP number saved', 'Hakuna namba ya CHP')}</strong>
           <span className="home-alert__body">{tx('Alerts will reach no one. Tap here to add your CHP.', 'Tahadhari haitamfikia mtu. Gusa hapa kuongeza CHP wako.')}</span>
         </button>
+      ) : null}
+
+      {demoOk ? (
+        <section aria-labelledby="demo-mothers-title" data-testid="demo-mothers">
+          <h2 id="demo-mothers-title" className="set-h2">
+            {tx('Demo mothers', 'Mama wa onyesho')}
+          </h2>
+          <p className="n-hint" id="demo-mothers-hint">
+            {tx(
+              'Two different mothers. Njoki is still pregnant. Wanjiku has given birth. Each keeps her own stage, check-ins and readings.',
+              'Mama wawili tofauti. Njoki bado ana mimba. Wanjiku ameshajifungua. Kila mmoja ana hatua, ukaguzi na vipimo vyake.',
+            )}
+          </p>
+          <div className="set-exp" role="radiogroup" aria-labelledby="demo-mothers-title" aria-describedby="demo-mothers-hint">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={demoMother === 'njoki'}
+              className="set-exp__card"
+              data-testid="demo-mother-njoki"
+              disabled={switching !== null}
+              onClick={() => void pickMother('njoki')}
+            >
+              <span className="set-exp__label">Njoki</span>
+              <span className="set-exp__sub">{tx('Heavily pregnant', 'Mimba nzito')}</span>
+              {demoMother === 'njoki' ? <span className="set-exp__check" aria-hidden>✓</span> : null}
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={demoMother === 'wanjiku'}
+              className="set-exp__card"
+              data-testid="demo-mother-wanjiku"
+              disabled={switching !== null}
+              onClick={() => void pickMother('wanjiku')}
+            >
+              <span className="set-exp__label">Wanjiku</span>
+              <span className="set-exp__sub">{tx('Has given birth', 'Ameshajifungua')}</span>
+              {demoMother === 'wanjiku' ? <span className="set-exp__check" aria-hidden>✓</span> : null}
+            </button>
+          </div>
+          {switchError ? (
+            <p className="field-error" role="alert">
+              {switchError}
+            </p>
+          ) : null}
+        </section>
       ) : null}
 
       <section aria-labelledby="exp-title">
