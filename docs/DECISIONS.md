@@ -154,3 +154,21 @@ Mood after birth still uses what she reports and the EPDS. Neema does not tell h
 The mothers' circle uses a cartoon name and bird. Her real name is never written there. Notes she writes stay on this phone. The three opening notes are written by Neema so the room is not empty. They are not other mothers online. A shared circle across phones needs a server we do not have yet.
 
 Swahili added for these screens needs a Swahili speaker's review.
+
+## Voice, texts, and the SOS call
+
+A quiet warning (yellow) is still a text she sends from her phone. An urgent alert, including SOS, does both: a text and a phone call that Neema places to her CHP and the one family number, saying the same words as the text.
+
+The call goes out only when a phone line is configured (Africa's Talking, or Twilio). The server never dials 999 or 112. Those stay on her own phone, and she still presses the green button. If the line is not configured, the text buttons and the 999 dialer work as before, and the screen does not say a call was placed or a text was sent.
+
+Her phone starts speaking within a moment, using its own voice, and switches to the studio voice only if that answer arrives in time.
+
+The sign-language line shows its sentence from the small clip list at once, and the clips are fetched while she is still on the hello figure, so the figure does not sit on "loading". The clips are still research American Sign Language, not Kenyan Sign Language.
+
+## Watching each mother by her own story
+
+After birth, a heavy bleed or a transfusion, a caesarean, and a birth with none of those are not the same watch. The plan can only tighten the general limits, never loosen them. A bleed or a transfusion watches the pulse more closely for 6 weeks, including a slow climb, and asks about bleeding, faintness, and breath. A caesarean asks about the wound and fever. It does not tighten the pulse unless she also bled or was transfused. A birth with no history keeps the general watch.
+
+The closer pulse check is a draft. It asks her to check (yellow). It does not call for help from the climb alone, and it waits through 20 minutes, not one minute. The phone still cannot tell rest from carrying a load. The numbers need a clinician before real use. The card does not say high-risk, and it does not name haemorrhage, pre-eclampsia, or sepsis.
+
+A quiet heads-up to her CHP may say why, in the third person. A red message that also reaches family does not include her history.
