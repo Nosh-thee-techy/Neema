@@ -7,16 +7,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToday } from '../../hooks/useToday';
-import { IconDots, IconFeel, IconMic, IconPlus, IconRefresh, IconSpark } from '../icons';
+import { IconDots, IconFeel, IconMic, IconPlus, IconSpark } from '../icons';
 import { ASL_PLAYBACK_RATE, AslPlayer, warmSignClips, type SignedLine } from './AslPlayer';
 import { ASL_CITATION, ASL_LABEL } from './aslLibrary';
-import {
-  SIGN_SHOWCASE,
-  answersForClip,
-  guideForAnswer,
-  type GuideReply,
-  type SignAnswer,
-} from './signScript';
+import { SIGN_OPENING, SIGN_TALK, signBeat, type GuideReply, type SignChoice } from './signScript';
 
 function prefersReducedMotion() {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -24,14 +18,7 @@ function prefersReducedMotion() {
 
 export type SignHandoff = NonNullable<GuideReply['handoff']>;
 
-function answerIcon(id: string) {
-  if (id.includes('help') || id.includes('worse') || id.includes('pain')) return <IconFeel />;
-  if (id.includes('thank') || id.includes('hello') || id.includes("i'm here") || id === 'hello') return <IconSpark />;
-  if (id.includes('ready') || id.includes('yes') || id.includes('better')) return <IconRefresh />;
-  return <IconPlus />;
-}
-
-/** Full-screen signed conversation: animated orb + glass tap answers. */
+/** Full-screen signed conversation: Neema signs, she answers on the chips. */
 export function SignSession({
   lang = 'en',
   onLeave,
@@ -46,8 +33,8 @@ export function SignSession({
   const today = useToday('sign');
   const name = today.name ?? 'Mama';
 
-  const [phrase, setPhrase] = useState(0);
-  const [reply, setReply] = useState<GuideReply | null>(null);
+  const [beatId, setBeatId] = useState(SIGN_OPENING);
+  const [youSaid, setYouSaid] = useState('');
   const [line, setLine] = useState<SignedLine | null>(null);
   const [problem, setProblem] = useState('');
   const [paused, setPaused] = useState(prefersReducedMotion);
@@ -58,46 +45,27 @@ export function SignSession({
   const [started, setStarted] = useState(false);
 
   useEffect(() => {
-    warmSignClips(SIGN_SHOWCASE.map((item) => item.id));
+    warmSignClips(SIGN_TALK.map((item) => item.clipId));
   }, []);
 
-  const order = SIGN_SHOWCASE.map((item) => item.id);
-  const clipId = order[Math.min(phrase, Math.max(order.length - 1, 0))] ?? '';
-  const shown = SIGN_SHOWCASE[Math.min(phrase, Math.max(SIGN_SHOWCASE.length - 1, 0))];
-  const says = shown ? (lang === 'sw' ? shown.saysSw : shown.saysEn) : 'Hi';
-  const answers: SignAnswer[] = useMemo(
-    () => (clipId ? answersForClip(clipId) : []),
-    [clipId],
-  );
-  const total = order.length;
+  const beat = useMemo(() => signBeat(beatId), [beatId]);
+  const clipId = beat.clipId;
+  const says = lang === 'sw' ? beat.saysSw : beat.saysEn;
+  const note = lang === 'sw' ? beat.noteSw : beat.noteEn;
   const signing = started && !done && !problem;
 
   const showLine = useCallback((next: SignedLine | null) => setLine(next), []);
   const showProblem = useCallback((message: string) => setProblem(message), []);
 
-  function onAnswer(id: string) {
-    const guide = guideForAnswer(id);
-    setReply(guide);
-    const handoff = guide.handoff ?? 'continue';
-
-    if (handoff === 'end' || handoff === 'home') {
-      setDone(true);
-      onHandoff?.(handoff);
-      return;
-    }
-    if (handoff === 'alert_sms' || handoff === 'facility') {
-      onHandoff?.(handoff);
-    }
-
-    setPhrase((s) => {
-      if (s >= total - 1) {
-        setDone(true);
-        return s;
-      }
-      return s + 1;
-    });
-    setReplay((n) => n + 1);
+  function onChoice(choice: SignChoice) {
+    setYouSaid(lang === 'sw' ? choice.chipSw : choice.chipEn);
+    setStarted(true);
     setPaused(false);
+    const next = signBeat(choice.next);
+    setBeatId(next.id);
+    setReplay((n) => n + 1);
+    if (next.choices.length === 0) setDone(true);
+    if (choice.handoff && choice.handoff !== 'continue') onHandoff?.(choice.handoff);
   }
 
   function begin() {
@@ -186,7 +154,7 @@ export function SignSession({
       </header>
 
       <section className="sign-session__hero" aria-label={lang === 'sw' ? 'Maneno kwa mama' : 'Words for her'}>
-        <div className={shown?.urgent ? 'sign-session__stage sign-session__stage--urgent' : 'sign-session__stage'}>
+        <div className={beat.urgent ? 'sign-session__stage sign-session__stage--urgent' : 'sign-session__stage'}>
           <AslPlayer
             clipId={clipId}
             tall
@@ -199,56 +167,47 @@ export function SignSession({
           />
         </div>
 
+        {youSaid ? (
+          <p className="sign-session__you">
+            {lang === 'sw' ? 'Umesema' : 'You said'} <strong>{youSaid}</strong>
+          </p>
+        ) : null}
         <p className="sign-session__means">
-          {shown?.urgent
+          {beat.urgent
             ? lang === 'sw'
-              ? 'Anahitaji msaada'
-              : 'She needs help'
+              ? 'Neema anasema — msaada'
+              : 'Neema says — help'
             : lang === 'sw'
               ? 'Neema anasema'
               : 'Neema says'}
         </p>
         <p
-          className={shown?.urgent ? 'sign-session__line sign-session__line--urgent' : 'sign-session__line'}
+          className={beat.urgent ? 'sign-session__line sign-session__line--urgent' : 'sign-session__line'}
           aria-live="polite"
         >
           {says}
         </p>
-        <div className="sign-session__phrases" role="tablist" aria-label={lang === 'sw' ? 'Misemo' : 'Phrases'}>
-          {SIGN_SHOWCASE.map((item, index) => (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              className={item.urgent ? 'sign-session__phrase sign-session__phrase--urgent' : 'sign-session__phrase'}
-              aria-selected={index === phrase}
-              onClick={() => {
-                setPhrase(index);
-                setDone(false);
-                setReplay((n) => n + 1);
-                setPaused(false);
-              }}
-            >
-              {lang === 'sw' ? item.chipSw : item.chipEn}
-            </button>
-          ))}
-        </div>
+        {note ? <p className="sign-session__note">{note}</p> : null}
+        {beat.choices.length > 0 ? (
+          <>
+            <p className="sign-session__answer-label" id="sign-answer-heading">
+              {lang === 'sw' ? 'Jibu lako' : 'Your answer'}
+            </p>
+            <div className="sign-session__phrases" role="group" aria-labelledby="sign-answer-heading">
+              {beat.choices.map((item) => (
+                <button
+                  key={`${beat.id}-${item.id}-${item.next}`}
+                  type="button"
+                  className={item.urgent ? 'sign-session__phrase sign-session__phrase--urgent' : 'sign-session__phrase'}
+                  onClick={() => onChoice(item)}
+                >
+                  {lang === 'sw' ? item.chipSw : item.chipEn}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : null}
       </section>
-
-      {reply ? (
-        <section
-          className={reply.danger ? 'sign-session__guide sign-session__guide--danger' : 'sign-session__guide'}
-          role={reply.danger ? 'alert' : 'status'}
-          aria-live={reply.danger ? 'assertive' : 'polite'}
-        >
-          <p className="soft-note" style={{ margin: 0 }}>
-            {lang === 'sw' ? 'Mwongozo anasema' : 'The guide says'}
-          </p>
-          <p style={{ margin: '0.35rem 0 0', fontWeight: 600 }}>
-            {lang === 'sw' ? reply.textSw : reply.textEn}
-          </p>
-        </section>
-      ) : null}
 
       {!started ? (
         <section className="sign-session__actions" aria-label={lang === 'sw' ? 'Anza' : 'Start'}>
@@ -285,42 +244,24 @@ export function SignSession({
           </button>
         </section>
       ) : !done ? (
-        <section className="sign-session__actions" aria-labelledby="sign-answer-heading">
-          <h2 id="sign-answer-heading" className="visually-hidden">
-            {lang === 'sw' ? 'Jibu lako' : 'Your answer'}
-          </h2>
-          {answers.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className="sign-session__action"
-              onClick={() => onAnswer(item.id)}
-            >
-              <span className="sign-session__action-ico" data-tone="a">
-                {answerIcon(item.id)}
-              </span>
-              {lang === 'sw' ? item.labelSw : item.labelEn}
-            </button>
-          ))}
-          <div className="sign-session__playback">
-            <button type="button" className="sign-session__chip" aria-pressed={paused} onClick={() => setPaused((v) => !v)}>
-              {paused ? (lang === 'sw' ? 'Cheza' : 'Play') : lang === 'sw' ? 'Simamisha' : 'Pause'}
-            </button>
-            <button
-              type="button"
-              className="sign-session__chip"
-              onClick={() => {
-                setReplay((n) => n + 1);
-                setPaused(false);
-              }}
-            >
-              {lang === 'sw' ? 'Tena' : 'Again'}
-            </button>
-            <button type="button" className="sign-session__chip" aria-pressed={slow} onClick={() => setSlow((v) => !v)}>
-              {lang === 'sw' ? 'Polepole' : 'Slower'}
-            </button>
-          </div>
-        </section>
+        <div className="sign-session__playback">
+          <button type="button" className="sign-session__chip" aria-pressed={paused} onClick={() => setPaused((v) => !v)}>
+            {paused ? (lang === 'sw' ? 'Cheza' : 'Play') : lang === 'sw' ? 'Simamisha' : 'Pause'}
+          </button>
+          <button
+            type="button"
+            className="sign-session__chip"
+            onClick={() => {
+              setReplay((n) => n + 1);
+              setPaused(false);
+            }}
+          >
+            {lang === 'sw' ? 'Tena' : 'Again'}
+          </button>
+          <button type="button" className="sign-session__chip" aria-pressed={slow} onClick={() => setSlow((v) => !v)}>
+            {lang === 'sw' ? 'Polepole' : 'Slower'}
+          </button>
+        </div>
       ) : (
         <div className="sign-session__done">
           <button type="button" className="btn btn-primary" style={{ width: '100%' }} onClick={onLeave}>

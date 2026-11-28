@@ -95,6 +95,109 @@ export const SIGN_SHOWCASE: SignShowcaseLine[] = [
   },
 ];
 
+/**
+ * Spoken conversation. Neema signs one line. The chips are what she answers.
+ * The next line depends on that tap.
+ */
+export type SignChoice = {
+  id: string;
+  chipEn: string;
+  chipSw: string;
+  urgent?: boolean;
+  next: string;
+  handoff?: GuideReply['handoff'];
+};
+
+export type SignBeat = {
+  id: string;
+  clipId: string;
+  saysEn: string;
+  saysSw: string;
+  noteEn?: string;
+  noteSw?: string;
+  urgent?: boolean;
+  choices: SignChoice[];
+};
+
+export const SIGN_OPENING = 'greet';
+
+export const SIGN_TALK: SignBeat[] = [
+  {
+    id: 'greet',
+    clipId: 'FzQPg4aqNYc_0-1',
+    saysEn: 'Hi',
+    saysSw: 'Habari',
+    choices: [
+      { id: 'hello', chipEn: 'Hi', chipSw: 'Habari', next: 'ask' },
+      { id: 'need help', chipEn: 'I need help', chipSw: 'Nahitaji msaada', urgent: true, next: 'go' },
+    ],
+  },
+  {
+    id: 'ask',
+    clipId: '1xKU91ggLeI_2-5',
+    saysEn: 'Are you feeling okay?',
+    saysSw: 'Unajisikiaje?',
+    choices: [
+      { id: 'better', chipEn: "I'm okay", chipSw: 'Niko sawa', next: 'calm' },
+      { id: 'need help', chipEn: 'I need help', chipSw: 'Nahitaji msaada', urgent: true, next: 'go' },
+    ],
+  },
+  {
+    id: 'calm',
+    clipId: '06jk1stVwMI_2-5',
+    saysEn: 'You are okay',
+    saysSw: 'Uko salama',
+    noteEn: 'Stay near your phone. Tap I need help if anything feels worse.',
+    noteSw: 'Kaa karibu na simu. Gusa Nahitaji msaada ikizidi.',
+    choices: [
+      { id: 'thank you', chipEn: 'Thank you', chipSw: 'Asante', next: 'thanks' },
+      { id: 'need help', chipEn: 'I need help', chipSw: 'Nahitaji msaada', urgent: true, next: 'go' },
+    ],
+  },
+  {
+    id: 'go',
+    clipId: 'cQBrXCcfDyc_22-5',
+    saysEn: 'Go now',
+    saysSw: 'Nenda sasa',
+    noteEn: 'Go to a health facility. Your CHP message is the next step.',
+    noteSw: 'Nenda kituo cha afya. Ujumbe kwa CHP ndio hatua inayofuata.',
+    urgent: true,
+    choices: [
+      { id: 'ready', chipEn: 'Go now', chipSw: 'Nenda sasa', urgent: true, next: 'coming' },
+    ],
+  },
+  {
+    id: 'coming',
+    clipId: '5dodEz2r56M_16-8',
+    saysEn: 'Help is coming',
+    saysSw: 'Msaada unakuja',
+    noteEn: 'Open the message to your CHP, then go.',
+    noteSw: 'Fungua ujumbe kwa CHP, kisha nenda.',
+    urgent: true,
+    choices: [
+      {
+        id: 'need help',
+        chipEn: 'Help is coming',
+        chipSw: 'Msaada unakuja',
+        urgent: true,
+        next: 'thanks',
+        handoff: 'alert_sms',
+      },
+    ],
+  },
+  {
+    id: 'thanks',
+    clipId: '-0N0jbyBW6g_11-5',
+    saysEn: 'Thank you',
+    saysSw: 'Asante',
+    choices: [],
+  },
+];
+
+export function signBeat(id: string): SignBeat {
+  return SIGN_TALK.find((beat) => beat.id === id) ?? SIGN_TALK[0]!;
+}
+
 /** Default order = full night guide (used when no chapter is picked). */
 export const SIGN_ORDER: string[] = [
   'FzQPg4aqNYc_0-1',
