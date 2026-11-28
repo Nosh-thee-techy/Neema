@@ -7,6 +7,8 @@ import { BrandMark } from '../ui/BrandMark';
 import { BodyMap } from '../ui/BodyMap';
 import { Button } from '../ui/Button';
 import { LoadingScreen } from '../ui/LoadingScreen';
+import { useWatchPlan } from '../hooks/useWatchPlan';
+import { SYMPTOM_LABELS } from '../services/symptomLabels';
 
 /** Tap-to-select how she feels, with an optional body map. */
 export function SymptomsPage() {
@@ -16,6 +18,9 @@ export function SymptomsPage() {
   const [selected, setSelected] = useState<SymptomCode[]>([]);
   // The word list comes first: it is the quickest to read. The body picture is one tap away.
   const [showMap, setShowMap] = useState(false);
+  // Her watch plan: the questions Neema asks her every day come first, with the reason.
+  const { plan } = useWatchPlan();
+  const watchCodes = plan?.ask ?? [];
 
   const options: { code: SymptomCode; label: string }[] =
     lang === 'sw'
@@ -74,8 +79,24 @@ export function SymptomsPage() {
         {lang === 'sw' ? 'Gusa kila unachohisi leo. Unaweza kuchagua zaidi ya kimoja.' : 'Tap everything you feel today. You can choose more than one.'}
       </p>
 
+      {watchCodes.length > 0 && plan ? (
+        <section className="watch-ask" aria-labelledby="watch-ask-title">
+          <h2 id="watch-ask-title" className="watch-ask__title">
+            {lang === 'sw' ? 'Neema inakuuliza haya kila siku' : 'Neema asks you about these every day'}
+          </h2>
+          <p className="watch-ask__why">{plan.items.map((i) => (lang === 'sw' ? i.reason.sw : i.reason.en)).join(' ')}</p>
+          <div className="chip-grid">
+            {watchCodes.map((code) => (
+              <button key={code} type="button" className="chip" aria-pressed={selected.includes(code)} onClick={() => toggle(code)}>
+                {lang === 'sw' ? SYMPTOM_LABELS[code].sw : SYMPTOM_LABELS[code].en}
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <div className="chip-grid">
-        {options.map((opt) => (
+        {options.filter((opt) => !watchCodes.includes(opt.code)).map((opt) => (
           <button
             key={opt.code}
             type="button"

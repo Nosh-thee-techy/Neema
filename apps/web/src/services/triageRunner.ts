@@ -5,7 +5,9 @@
 
 import {
   evaluateTriage,
+  referenceValue,
   zScore,
+  type TriageConfig,
   type BpReading,
   type Stage,
   type SymptomReport,
@@ -22,6 +24,8 @@ export interface RunnerOptions {
   markedResting: boolean;
   /** IANA zone for sleep window; default Africa/Nairobi. */
   timeZone?: string;
+  /** Her watch-plan settings (stricter than the general ones). Default: general settings. */
+  config?: TriageConfig;
 }
 
 /**
@@ -62,9 +66,10 @@ export async function runTriage(options: RunnerOptions): Promise<TriageResult> {
 
   const hrBaseline = await db.baseline.get('hr');
   const tempBaseline = await db.baseline.get('temp');
+  const settled = await db.baseline.get('hr_ref');
   const latest = vitals[vitals.length - 1];
 
-  return evaluateTriage({
+  const input = {
     nowMs,
     stage: options.stage,
     ...(options.gestationWeeks !== undefined ? { gestationWeeks: options.gestationWeeks } : {}),
@@ -104,5 +109,16 @@ export async function runTriage(options: RunnerOptions): Promise<TriageResult> {
             )
           : null,
     },
-  });
+    hrReference: settled
+      ? referenceValue({
+          signal: 'hr_ref',
+          mean: settled.mean,
+          variance: settled.variance,
+          samples: settled.samples,
+          lastUpdatedMs: settled.lastUpdatedMs,
+          ready: settled.ready,
+        })
+      : null,
+  };
+  return options.config ? evaluateTriage(input, options.config) : evaluateTriage(input);
 }

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { RECOVERY_EMERGENCY_SIGNS, babyStageFor, getDefaultTriageConfig, insightForWeek, nextAncContact, nextPncContact, recoveryStageFor, type BpReading } from '@neema/core';
 import { useGuardian } from '../hooks/useGuardian';
 import { useLocale } from '../hooks/useLocale';
+import { useWatchPlan } from '../hooks/useWatchPlan';
+import { WatchingCard } from '../ui/WatchingCard';
 import { useToday } from '../hooks/useToday';
 import { useVitalsTrend } from '../hooks/useVitalsTrend';
 import { displayTemp } from '../ui/VitalsDashboard';
@@ -82,6 +84,7 @@ export function HomePage() {
   const tx = (en: string, swText: string) => (sw ? swText : en);
   const level = g.triage?.level ?? 'UNKNOWN';
   const today = useToday(`${level}:${g.recheck.status}`);
+  const watch = useWatchPlan(`${level}:${g.recheck.status}`);
   const trend = useVitalsTrend(`${level}:${g.demoStep ?? ''}`);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [openLoops, setOpenLoops] = useState(0);
@@ -195,6 +198,13 @@ export function HomePage() {
   }
 
   const anyAttention = [bpTone, hrTone, tempTone].some((x) => x === 'watch' || x === 'alert');
+  const readsNote = anyAttention
+    ? tx('Look at the note under the number that needs attention.', 'Angalia dokezo chini ya namba inayohitaji uangalifu.')
+    : !bp && !g.connected
+      ? tx('Blood pressure is the one you add yourself. Heart rate and temperature come from the band.', 'Shinikizo unaliongeza mwenyewe. Mapigo na joto vinatoka kwenye bendi.')
+      : !g.connected
+        ? tx('Heart rate and temperature show when the band is on.', 'Mapigo na joto vinaonekana bendi ikiwa imewashwa.')
+        : tx('These are the latest numbers saved on this phone.', 'Hizi ndizo namba za karibuni zilizohifadhiwa kwenye simu hii.');
 
   // ── Pregnancy + this week ───────────────────────────────────────────────
   const preg = today.pregnancy;
@@ -445,6 +455,9 @@ export function HomePage() {
         ))}
       </nav>
 
+      {/* Her watch plan: what Neema watches more closely for her, and why */}
+      <WatchingCard snap={watch} sw={sw} />
+
       {/* Daily insights */}
       <section className="today-insights" aria-labelledby="insights-title">
         <div className="today-insights__head">
@@ -475,7 +488,9 @@ export function HomePage() {
           <h2 id="reads-title">{tx('Your latest readings', 'Vipimo vyako vya karibuni')}</h2>
           {anyAttention ? <span className="reads__chip">{tx('Needs attention', 'Inahitaji uangalifu')}</span> : null}
         </div>
+        <p className="reads__insight">{readsNote}</p>
 
+        <div className="reads__stats">
         <ReadRow
           icon={<IconPressure />}
           label={tx('Blood pressure', 'Shinikizo la damu')}
@@ -524,6 +539,7 @@ export function HomePage() {
             spark={<Spark values={today.recoveryCheckins.slice().reverse().flatMap((c) => (c.sleep ? [SLEEP_HOURS[c.sleep]] : []))} tone="calm" />}
           />
         ) : null}
+        </div>
         {postpartum && anyAttention ? (
           <div className="reads__ask">
             <p>{tx('A reading needs attention. Answer a few questions so Neema can tell you what to do next.', 'Kipimo kinahitaji uangalifu. Jibu maswali machache ili Neema akuambie hatua inayofuata.')}</p>
@@ -534,26 +550,29 @@ export function HomePage() {
         ) : null}
 
         <div className="reads__btns">
-          {/* Secondary on purpose: the daily check-in is the one main action on this screen. */}
-          <button type="button" className="btn btn-secondary" onClick={() => nav('/bp')}>
-            {tx('Add blood pressure', 'Ongeza shinikizo')}
+          {/* Quiet rows on purpose: the daily check-in stays the one main action on this screen. */}
+          <button type="button" className="reads__go" onClick={() => nav('/bp')}>
+            <span>{tx('Add blood pressure', 'Ongeza shinikizo')}</span>
+            <IconChevron />
           </button>
           {!g.connected ? (
-            <button type="button" className="btn btn-secondary" onClick={() => nav('/vitals')}>
-              {tx('Connect band', 'Unganisha bendi')}
+            <button type="button" className="reads__go" onClick={() => nav('/vitals')}>
+              <span>{tx('Connect band', 'Unganisha bendi')}</span>
+              <IconChevron />
             </button>
           ) : null}
+          <a
+            className="reads__go reads__history"
+            href="/history"
+            onClick={(e) => {
+              e.preventDefault();
+              nav('/history');
+            }}
+          >
+            <span className="n-link">{tx('View health history', 'Ona historia ya afya')}</span>
+            <IconChevron />
+          </a>
         </div>
-        <a
-          className="n-link reads__history"
-          href="/history"
-          onClick={(e) => {
-            e.preventDefault();
-            nav('/history');
-          }}
-        >
-          {tx('View health history', 'Ona historia ya afya')} →
-        </a>
         <p className="reads__note">
           {tx('Neema does not diagnose. Alert levels are set by your health team.', 'Neema hatambui ugonjwa. Viwango vya hatari huwekwa na timu ya afya.')}
         </p>
@@ -567,6 +586,7 @@ export function HomePage() {
           <strong>{tx("Mothers' circle", 'Duara la mama')}</strong>
           <small>{tx('Anonymous. A cartoon name, never yours.', 'Bila jina. Jina la katuni, si lako.')}</small>
         </span>
+        <IconChevron />
       </button>
 
       <p className="trust-line">{t('saved_here')}</p>

@@ -6,6 +6,7 @@
 import {
   createBaseline,
   updateBaseline,
+  updateReference,
   type BaselineSignal,
   type BaselineState,
   type VitalsMinute,
@@ -65,6 +66,9 @@ export async function ingestMinuteIntoBaseline(
     hr = updated.state;
     hrZ = updated.z;
     await saveState(hr);
+    // Her settled pulse (slow, about a day) for the watch plan's slow-rise check.
+    const settled = updateReference(await loadBaseline('hr_ref', minute.tsMs), minute.hrMean, minute.tsMs);
+    await saveState(settled.state);
   }
   if (minute.tempMeanC !== null) {
     const updated = updateBaseline(temp, minute.tempMeanC, minute.tsMs);
@@ -74,4 +78,13 @@ export async function ingestMinuteIntoBaseline(
   }
 
   return { hr, temp, hrZ, tempZ };
+}
+
+/**
+ * Starts her settled pulse again. Called when the birth is recorded or removed:
+ * pregnancy raises the resting pulse, so after birth her settled pulse is learned fresh.
+ * The fast baseline is left alone (it re-learns within the hour on its own).
+ */
+export async function restartSettledPulse(): Promise<void> {
+  await db.baseline.delete('hr_ref');
 }

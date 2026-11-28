@@ -410,7 +410,24 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  margin-bottom: 0.3rem;
+}
+
+.reads__insight {
+  margin: 0.45rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+.reads__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+}
+
+.reads__stats:has(.read-row:nth-child(4)) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .reads__head h2 {
@@ -428,17 +445,20 @@
 
 .read-row {
   display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.7rem 0;
-  border-bottom: 1px solid var(--line);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.7rem 0.6rem 0.75rem;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg) 55%, #fff);
 }
 
 .read-row__icon {
   flex: none;
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   display: grid;
   place-items: center;
   background: var(--tint);
@@ -451,20 +471,23 @@
 }
 
 .read-row__main {
-  flex: 1;
-  min-width: 0;
-  display: grid;
+  display: contents;
 }
 
 .read-row__label {
-  font-size: 0.8rem;
+  order: 2;
+  font-size: 0.78rem;
+  line-height: 1.25;
   color: var(--ink-muted);
 }
 
 .read-row__value {
-  font-size: 1.35rem;
-  font-weight: 800;
-  line-height: 1.15;
+  order: 1;
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
 }
 
 .read-row__value small {
@@ -474,12 +497,15 @@
 }
 
 .read-row__flag {
+  order: 3;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 0.3rem;
-  font-size: 0.8rem;
-  font-weight: 700;
+  margin-top: auto;
+  font-size: 0.72rem;
+  font-weight: 650;
+  line-height: 1.3;
 }
 
 .read-row__flag i {
@@ -494,8 +520,16 @@
   color: var(--ink-muted);
 }
 
+.read-row[data-tone='calm'] {
+  background: #eef6f1;
+}
+
 .read-row[data-tone='calm'] .read-row__flag i {
   background: var(--calm);
+}
+
+.read-row[data-tone='watch'] {
+  background: #fbf3e4;
 }
 
 .read-row[data-tone='watch'] .read-row__flag {
@@ -504,6 +538,10 @@
 
 .read-row[data-tone='watch'] .read-row__flag i {
   background: var(--warn);
+}
+
+.read-row[data-tone='alert'] {
+  background: #fbe8ea;
 }
 
 .read-row[data-tone='alert'] .read-row__flag {
@@ -519,9 +557,7 @@
 }
 
 .read-row__spark {
-  flex: none;
-  width: 60px;
-  height: 20px;
+  display: none;
 }
 
 svg.read-row__spark polyline {
@@ -537,7 +573,37 @@ svg.read-row__spark[data-tone='alert'] polyline {
 }
 
 .reads__btns {
-  margin-top: 0.85rem;
+  display: grid;
+  margin-top: 0.35rem;
+}
+
+.reads__go {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 48px;
+  padding: 0.55rem 0.1rem;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.reads__go svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--ink-muted);
+}
+
+.reads__go .n-link {
+  font-weight: 650;
 }
 
 .reads__note {
@@ -776,8 +842,7 @@ svg.read-row__spark[data-tone='alert'] polyline {
 }
 
 .reads__history {
-  display: inline-block;
-  margin-top: 0.8rem;
+  display: flex;
 }
 
 @media (min-width: 560px) {
