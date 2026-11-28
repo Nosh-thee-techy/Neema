@@ -17,7 +17,6 @@ import type { Lang } from '../hooks/useLocale';
 import type { VitalsTrend } from '../hooks/useVitalsTrend';
 import { RingGauge, type GaugeTone } from './RingGauge';
 import { NormalArc } from './NormalArc';
-import { TrendChart } from './TrendChart';
 import { IconBand, IconHeart, IconPressure, IconTemp, IconUser } from './icons';
 
 const config = getDefaultTriageConfig();
@@ -245,55 +244,95 @@ interface TrendProps {
   windowMinutes?: number;
 }
 
-/** Trend card with a heart rate / temperature switch — last-hour chart. */
+function hourExtent(values: number[]): { low: number; high: number } | null {
+  if (values.length === 0) return null;
+  let low = values[0]!;
+  let high = values[0]!;
+  for (let i = 1; i < values.length; i += 1) {
+    const value = values[i]!;
+    if (value < low) low = value;
+    if (value > high) high = value;
+  }
+  return { low, high };
+}
+
+/** Current heart rate or temperature, this hour's range, and one plain insight. No chart. */
 export function TrendCard({ lang, trend, windowMinutes = 60 }: TrendProps) {
   const [signal, setSignal] = useState<'hr' | 'temp'>('hr');
-  const now = Date.now();
-  const band = signal === 'hr' ? trend.hr.range : trend.temp.range;
-  const points =
-    signal === 'hr'
-      ? trend.minutes.filter((m) => m.hrMean !== null).map((m) => ({ tsMs: m.tsMs, value: m.hrMean as number }))
-      : trend.minutes.filter((m) => m.tempMeanC !== null).map((m) => ({ tsMs: m.tsMs, value: m.tempMeanC as number }));
+  const isHr = signal === 'hr';
+  const band = isHr ? trend.hr.range : trend.temp.range;
+  const values = isHr
+    ? trend.minutes.flatMap((m) => (m.hrMean === null ? [] : [m.hrMean]))
+    : trend.minutes.flatMap((m) => (m.tempMeanC === null ? [] : [m.tempMeanC]));
+  const extent = hourExtent(values);
+  const latest = values.length > 0 ? values[values.length - 1]! : null;
+  const show = (value: number) => (isHr ? fmt(value) : fmt(value, 1));
+  const outside = extent !== null && band !== null && (extent.low < band.low || extent.high > band.high);
+
+  const insight = !extent
+    ? isHr
+      ? sw(lang, 'Hakuna mapigo saa hii. Namba itaonekana bendi ikiwa imevaliwa.', 'No heart-rate reading this hour. It shows here when the band is on.')
+      : sw(lang, 'Hakuna joto saa hii. Namba itaonekana bendi ikiwa imevaliwa.', 'No temperature this hour. It shows here when the band is on.')
+    : band
+      ? outside
+        ? sw(
+            lang,
+            `Saa hii ${show(extent.low)}–${show(extent.high)} imetoka nje ya kawaida yako ${show(band.low)}–${show(band.high)}. Neema anaangalia mabadiliko hayo.`,
+            `This hour, ${show(extent.low)}–${show(extent.high)}, went outside your normal of ${show(band.low)}–${show(band.high)}. Neema watches that change.`,
+          )
+        : sw(
+            lang,
+            `Saa hii ${show(extent.low)}–${show(extent.high)} iko ndani ya kawaida yako ${show(band.low)}–${show(band.high)}.`,
+            `This hour, ${show(extent.low)}–${show(extent.high)}, stays inside your normal of ${show(band.low)}–${show(band.high)}.`,
+          )
+      : isHr
+        ? sw(
+            lang,
+            `Saa hii mapigo yamekuwa ${show(extent.low)}–${show(extent.high)}. Neema bado anajifunza kawaida yako. Inachukua kama siku 3.`,
+            `This hour your heart rate has been ${show(extent.low)}–${show(extent.high)}. Neema is still learning your normal. That takes about 3 days.`,
+          )
+        : sw(
+            lang,
+            `Saa hii joto limekuwa ${show(extent.low)}–${show(extent.high)}°. Ukaguzi wa homa unaanza ${fmt(config.fever.tempC, 1)}°.`,
+            `This hour your temperature has been ${show(extent.low)}–${show(extent.high)}°. A fever check starts at ${fmt(config.fever.tempC, 1)}°.`,
+          );
 
   return (
-    <section className="trend-card panel" aria-label={signal === 'hr' ? sw(lang, 'Mapigo ya moyo', 'Heart rate') : sw(lang, 'Joto', 'Temperature')}>
+    <section className="trend-card panel" aria-label={isHr ? sw(lang, 'Mapigo ya moyo', 'Heart rate') : sw(lang, 'Joto', 'Temperature')}>
       <header className="trend-card__head">
         <div className="trend-card__intro">
-          <h2 className="trend-card__title">
-            {signal === 'hr' ? sw(lang, 'Mapigo ya moyo', 'Heart rate') : sw(lang, 'Joto', 'Temperature')}
-          </h2>
-          <p className="trend-card__sub soft-note">
-            {sw(lang, `Dakika ${windowMinutes} zilizopita`, `Last ${windowMinutes} minutes`)}
-          </p>
+          <h2 className="trend-card__title">{isHr ? sw(lang, 'Mapigo ya moyo', 'Heart rate') : sw(lang, 'Joto', 'Temperature')}</h2>
+          <p className="trend-card__sub soft-note">{sw(lang, `Saa hii · dakika ${windowMinutes}`, `This hour · ${windowMinutes} minutes`)}</p>
         </div>
         <div className="segmented" role="group" aria-label={sw(lang, 'Chagua kipimo', 'Choose reading')}>
-          <button type="button" aria-pressed={signal === 'hr'} onClick={() => setSignal('hr')}>
+          <button type="button" aria-pressed={isHr} onClick={() => setSignal('hr')}>
             {sw(lang, 'Mapigo', 'Heart')}
           </button>
-          <button type="button" aria-pressed={signal === 'temp'} onClick={() => setSignal('temp')}>
+          <button type="button" aria-pressed={!isHr} onClick={() => setSignal('temp')}>
             {sw(lang, 'Joto', 'Temp')}
           </button>
         </div>
       </header>
-      <TrendChart
-        points={points}
-        windowMinutes={windowMinutes}
-        nowMs={now}
-        band={band}
-        limit={signal === 'temp' ? { value: config.fever.tempC, label: sw(lang, 'homa', 'fever') } : null}
-        yMin={signal === 'hr' ? 60 : 36}
-        yMax={signal === 'hr' ? 100 : 38.5}
-        format={(v) => (signal === 'hr' ? fmt(v) : fmt(v, 1))}
-        emptyLabel={sw(lang, 'Bado hakuna vipimo saa hii', 'No readings this hour yet')}
-        nowLabel={sw(lang, 'sasa', 'now')}
-        ariaLabel={signal === 'hr' ? sw(lang, 'Grafu ya mapigo ya moyo', 'Heart rate chart') : sw(lang, 'Grafu ya joto', 'Temperature chart')}
-      />
-      <p className="trend-card__legend">
-        <span className="trend-card__swatch" aria-hidden />
-        {band
-          ? sw(lang, 'Eneo la kijani: kawaida yako', 'Green band: your normal')
-          : sw(lang, 'Kawaida yako itaonekana baada ya siku 3', 'Your normal appears after 3 days')}
+      <p className="trend-card__now">
+        {latest === null ? '—' : show(latest)}
+        {latest !== null ? <small>{isHr ? 'bpm' : '°'}</small> : null}
+        <span>{sw(lang, 'sasa', 'now')}</span>
       </p>
+      <dl className="trend-card__stats">
+        <div>
+          <dt>{sw(lang, 'Saa hii', 'This hour')}</dt>
+          <dd>{extent ? `${show(extent.low)}–${show(extent.high)}` : '—'}</dd>
+        </div>
+        <div>
+          <dt>{sw(lang, 'Kawaida yako', 'Your normal')}</dt>
+          <dd>{band ? `${show(band.low)}–${show(band.high)}` : sw(lang, 'inajifunza', 'learning')}</dd>
+        </div>
+        <div>
+          <dt>{sw(lang, 'Dakika', 'Minutes')}</dt>
+          <dd>{values.length}</dd>
+        </div>
+      </dl>
+      <p className="trend-card__insight">{insight}</p>
     </section>
   );
 }
