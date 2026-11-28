@@ -28,3 +28,15 @@ export const MESSAGE_TO_ASL_CLIP: Record<string, string> = {
 export function clipUrl(clipId: string): string {
   return `/signing/asl/packets/${encodeURIComponent(clipId)}.json`;
 }
+
+export type ClipCaption = { id: string; sentence: string; frames: number };
+
+let captionsPromise: Promise<ClipCaption[]> | null = null;
+
+/** The sentence for each clip, from the small manifest, before the motion file arrives. */
+export function loadClipCaptions(): Promise<ClipCaption[]> {
+  captionsPromise ??= fetch('/signing/asl/packets/manifest.json')
+    .then((res) => (res.ok ? (res.json() as Promise<ClipCaption[]>) : []))
+    .catch(() => []);
+  return captionsPromise;
+}

@@ -4,15 +4,14 @@
  * Clips are How2Sign research ASL, not KSL. Camera stays off.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToday } from '../../hooks/useToday';
 import { IconDots, IconFeel, IconMic, IconPlus, IconRefresh, IconSpark } from '../icons';
-import { NeemaAvatar } from '../NeemaAvatar';
-import { ASL_PLAYBACK_RATE, AslPlayer, type SignedLine } from './AslPlayer';
+import { ASL_PLAYBACK_RATE, AslPlayer, warmSignClips, type SignedLine } from './AslPlayer';
 import { ASL_CITATION, ASL_LABEL } from './aslLibrary';
 import {
-  SIGN_ORDER,
+  SIGN_SHOWCASE,
   answersForClip,
   guideForAnswer,
   type GuideReply,
@@ -47,7 +46,7 @@ export function SignSession({
   const today = useToday('sign');
   const name = today.name ?? 'Mama';
 
-  const [step, setStep] = useState(0);
+  const [phrase, setPhrase] = useState(0);
   const [reply, setReply] = useState<GuideReply | null>(null);
   const [line, setLine] = useState<SignedLine | null>(null);
   const [problem, setProblem] = useState('');
@@ -58,8 +57,14 @@ export function SignSession({
   const [menuOpen, setMenuOpen] = useState(false);
   const [started, setStarted] = useState(false);
 
-  const order = SIGN_ORDER;
-  const clipId = order[Math.min(step, Math.max(order.length - 1, 0))] ?? '';
+  useEffect(() => {
+    warmSignClips(SIGN_SHOWCASE.map((item) => item.id));
+  }, []);
+
+  const order = SIGN_SHOWCASE.map((item) => item.id);
+  const clipId = order[Math.min(phrase, Math.max(order.length - 1, 0))] ?? '';
+  const shown = SIGN_SHOWCASE[Math.min(phrase, Math.max(SIGN_SHOWCASE.length - 1, 0))];
+  const says = shown ? (lang === 'sw' ? shown.saysSw : shown.saysEn) : 'Hi';
   const answers: SignAnswer[] = useMemo(
     () => (clipId ? answersForClip(clipId) : []),
     [clipId],
@@ -84,7 +89,7 @@ export function SignSession({
       onHandoff?.(handoff);
     }
 
-    setStep((s) => {
+    setPhrase((s) => {
       if (s >= total - 1) {
         setDone(true);
         return s;
@@ -180,53 +185,54 @@ export function SignSession({
         </div>
       </header>
 
-      <section className="sign-session__hero" aria-label={lang === 'sw' ? 'Mtu anayefanya ishara' : 'Signing figure'}>
-        <div className="sign-session__orb" data-paused={paused} data-live={signing}>
-          <div className="sign-session__orb-glow" aria-hidden />
-          <div className="sign-session__orb-core">
-            {started ? (
-              <AslPlayer
-                clipId={clipId}
-                tall
-                passport
-                showCaption={false}
-                paused={paused}
-                speed={slow ? ASL_PLAYBACK_RATE * 0.65 : ASL_PLAYBACK_RATE}
-                replay={replay}
-                onLine={showLine}
-                onProblem={showProblem}
-              />
-            ) : (
-              <NeemaAvatar live label={lang === 'sw' ? 'Neema. Gusa umsalimie' : 'Neema. Tap to say hello'} />
-            )}
-          </div>
-          {/* Neema has her own eyes; the glowing eyes are only for the signing figure. */}
-          {started ? (
-            <span className="sign-session__orb-eyes" aria-hidden>
-              <i />
-              <i />
-            </span>
-          ) : null}
+      <section className="sign-session__hero" aria-label={lang === 'sw' ? 'Maneno kwa mama' : 'Words for her'}>
+        <div className={shown?.urgent ? 'sign-session__stage sign-session__stage--urgent' : 'sign-session__stage'}>
+          <AslPlayer
+            clipId={clipId}
+            tall
+            showCaption={false}
+            paused={paused}
+            speed={slow ? ASL_PLAYBACK_RATE * 0.65 : ASL_PLAYBACK_RATE}
+            replay={replay}
+            onLine={showLine}
+            onProblem={showProblem}
+          />
         </div>
 
-        {started ? (
-          <>
-            <p className="sign-session__line" aria-live="polite">
-              {line?.sentence ?? (lang === 'sw' ? 'Inapakia mstari…' : 'Loading the line…')}
-            </p>
-            <p className="sign-session__progress">
-              {lang === 'sw'
-                ? `Mstari ${Math.min(step + 1, total)} / ${total}`
-                : `Line ${Math.min(step + 1, total)} of ${total}`}
-            </p>
-          </>
-        ) : (
-          <p className="sign-session__hint">
-            {lang === 'sw'
-              ? 'Neema anafanya ishara. Kamera inazimwa.'
-              : 'Neema signs with you. The camera stays off.'}
-          </p>
-        )}
+        <p className="sign-session__means">
+          {shown?.urgent
+            ? lang === 'sw'
+              ? 'Anahitaji msaada'
+              : 'She needs help'
+            : lang === 'sw'
+              ? 'Neema anasema'
+              : 'Neema says'}
+        </p>
+        <p
+          className={shown?.urgent ? 'sign-session__line sign-session__line--urgent' : 'sign-session__line'}
+          aria-live="polite"
+        >
+          {says}
+        </p>
+        <div className="sign-session__phrases" role="tablist" aria-label={lang === 'sw' ? 'Misemo' : 'Phrases'}>
+          {SIGN_SHOWCASE.map((item, index) => (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              className={item.urgent ? 'sign-session__phrase sign-session__phrase--urgent' : 'sign-session__phrase'}
+              aria-selected={index === phrase}
+              onClick={() => {
+                setPhrase(index);
+                setDone(false);
+                setReplay((n) => n + 1);
+                setPaused(false);
+              }}
+            >
+              {lang === 'sw' ? item.chipSw : item.chipEn}
+            </button>
+          ))}
+        </div>
       </section>
 
       {reply ? (

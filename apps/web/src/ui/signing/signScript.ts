@@ -39,6 +39,62 @@ const ready: SignAnswer = { id: 'ready', labelEn: "I'm ready", labelSw: 'Niko ta
 const rest: SignAnswer = { id: 'rest', labelEn: 'I need to rest', labelSw: 'Nahitaji kupumzika' };
 const tired: SignAnswer = { id: 'tired', labelEn: "I'm tired", labelSw: 'Nimechoka' };
 
+/**
+ * Demo reel. Each clip is a How2Sign sign. The words under the figure are
+ * what the mother needs to see. The hands do not have to match those words.
+ */
+export type SignShowcaseLine = {
+  id: string;
+  saysEn: string;
+  saysSw: string;
+  chipEn: string;
+  chipSw: string;
+  /** Help lines: go now, bleeding, SOS. */
+  urgent?: boolean;
+};
+
+export const SIGN_SHOWCASE: SignShowcaseLine[] = [
+  { id: 'FzQPg4aqNYc_0-1', saysEn: 'Hi', saysSw: 'Habari', chipEn: 'Hi', chipSw: 'Habari' },
+  {
+    id: '1xKU91ggLeI_2-5',
+    saysEn: 'Are you feeling okay?',
+    saysSw: 'Unajisikiaje?',
+    chipEn: 'Feeling okay?',
+    chipSw: 'Unajisikiaje?',
+  },
+  {
+    id: '06jk1stVwMI_2-5',
+    saysEn: 'You are okay',
+    saysSw: 'Uko salama',
+    chipEn: 'You are okay',
+    chipSw: 'Uko salama',
+  },
+  {
+    id: 'g1HXoDkax5A_20-3',
+    saysEn: 'I need help now',
+    saysSw: 'Nahitaji msaada sasa',
+    chipEn: 'I need help',
+    chipSw: 'Nahitaji msaada',
+    urgent: true,
+  },
+  {
+    id: 'cQBrXCcfDyc_22-5',
+    saysEn: 'Go to a facility now',
+    saysSw: 'Nenda kituo sasa',
+    chipEn: 'Go now',
+    chipSw: 'Nenda sasa',
+    urgent: true,
+  },
+  {
+    id: '5dodEz2r56M_16-8',
+    saysEn: 'Help is on the way',
+    saysSw: 'Msaada unakuja',
+    chipEn: 'Help is coming',
+    chipSw: 'Msaada unakuja',
+    urgent: true,
+  },
+];
+
 /** Default order = full night guide (used when no chapter is picked). */
 export const SIGN_ORDER: string[] = [
   'FzQPg4aqNYc_0-1',

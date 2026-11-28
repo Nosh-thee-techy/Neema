@@ -50,7 +50,7 @@ export function SigningSlot({
       <div className="signing-slot__body">
         <strong>{lang === 'sw' ? titles.titleSw : titles.titleEn}</strong>
         {aslDemoEnabled && clipId ? (
-          <AslPlayer clipId={clipId} />
+          <AslPlayer clipId={clipId} showCaption={false} />
         ) : (
           <div className="signing-slot__frame" aria-hidden>
             <svg viewBox="0 0 48 48" width="40" height="40">
