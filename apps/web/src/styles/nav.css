@@ -198,6 +198,80 @@
   color: var(--ink-muted);
 }
 
+/* Share a period with a doctor — stacked so a 390px phone does not scroll sideways. */
+.hist-share {
+  display: grid;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.hist-share h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.hist-share__periods.n-tabs {
+  grid-template-columns: 1fr;
+}
+
+.hist-share__periods .n-tab {
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.hist-share__periods .n-tab[aria-checked='true']::before {
+  content: '✓';
+  margin-right: 0.45rem;
+}
+
+.hist-share__dates,
+.hist-share__counts,
+.hist-share__who {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.hist-share__dates {
+  font-size: 0.95rem;
+}
+
+.hist-share__qr {
+  display: grid;
+  justify-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.hist-share__qr .qr-canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+.hist-share__who {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 0.15rem;
+}
+
+.hist-share__who span,
+.hist-share__counts {
+  font-size: 0.88rem;
+  color: var(--ink-muted);
+}
+
+.hist-share__empty {
+  display: grid;
+  gap: 0.25rem;
+  text-align: center;
+}
+
+.hist-share__empty p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 /* ---------- Profile ---------- */
 .prof-id {
   display: flex;
@@ -577,4 +651,144 @@
   border-radius: var(--radius-sm);
   background: #f6e3da;
   font-size: 0.92rem;
+}
+
+/* ---------- Night view (sleep) ---------- */
+.sleep-night {
+  margin: 0 0 1rem;
+  background: linear-gradient(165deg, #243044 0%, #141a28 100%);
+  color: #f4efe6;
+  border-radius: 28px;
+  padding: 1.15rem 1rem 1rem;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.sleep-night__kicker {
+  margin: 0;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  color: #d9d0c3;
+}
+
+.sleep-night__hero {
+  display: grid;
+  grid-template-columns: 132px 1fr;
+  gap: 0.85rem;
+  align-items: center;
+}
+
+.sleep-ring {
+  width: 132px;
+  height: 132px;
+}
+
+.sleep-night__label {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-display, inherit);
+  font-size: 1.55rem;
+  font-weight: 400;
+  line-height: 1.1;
+}
+
+.sleep-night__guide,
+.sleep-night__insight,
+.sleep-night__quiet {
+  margin: 0;
+  line-height: 1.45;
+  color: #e7dfd2;
+  font-size: 0.95rem;
+}
+
+.sleep-night__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.sleep-night__stats div {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 0.6rem 0.5rem;
+  min-width: 0;
+}
+
+.sleep-night__stats span {
+  display: block;
+  font-size: 0.68rem;
+  color: #d9d0c3;
+  margin-bottom: 0.2rem;
+}
+
+.sleep-night__stats strong {
+  font-size: 1rem;
+  font-weight: 560;
+}
+
+.sleep-spark {
+  width: 100%;
+  height: 64px;
+}
+
+.sleep-week {
+  display: grid;
+  gap: 0.3rem;
+  align-items: end;
+  height: 72px;
+}
+
+.sleep-week__col {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  height: 100%;
+  align-items: end;
+  justify-items: center;
+  min-width: 0;
+}
+
+.sleep-week__col span {
+  width: 100%;
+  border-radius: 6px 6px 2px 2px;
+  background: #e7c27a;
+}
+
+.sleep-week__col span[data-empty='true'] {
+  background: rgba(255, 255, 255, 0.12);
+  height: 8% !important;
+}
+
+.sleep-week__col small {
+  font-size: 0.58rem;
+  color: #d9d0c3;
+}
+
+.sleep-night__picks p {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+  color: #d9d0c3;
+}
+
+.sleep-night__picks div {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.sleep-night__pick {
+  flex: 1;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.45rem 0.4rem;
+  background: rgba(255, 255, 255, 0.1);
+  color: #f4efe6;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 380px) {
+  .sleep-night__hero {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
 }

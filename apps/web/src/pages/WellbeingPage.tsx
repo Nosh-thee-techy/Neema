@@ -7,6 +7,7 @@ import { recoveryProgressOf } from '../services/delivery';
 import { endSleep, sleepingNow, startSleep } from '../services/sleepSession';
 import { db, type RecoveryCheckinRow } from '../storage/db';
 import { SLEEP_TEXT } from '../ui/RecoveryParts';
+import { SleepNight } from '../ui/SleepNight';
 
 const NIGHTS_KEY = 'neema.sleep.nights';
 
@@ -21,6 +22,12 @@ function loadNights(): { atMs: number; hours: number }[] {
 }
 
 const SLEEP_HOURS = { '0_2': 1, '3_4': 3.5, '5_6': 5.5, '7_plus': 7.5 } as const;
+
+function recentHours(nights: { atMs: number; hours: number }[]): number | null {
+  const latest = nights[0];
+  if (!latest) return null;
+  return Date.now() - latest.atMs < 20 * 60 * 60 * 1000 ? latest.hours : null;
+}
 const MOOD_SCORE = { very_low: 1, low: 2, okay: 3, good: 4 } as const;
 
 /**
@@ -81,6 +88,19 @@ export function WellbeingPage() {
           )}
         </p>
 
+        <SleepNight
+          sw={sw}
+          hours={recentHours(nights)}
+          week={nights
+            .slice(0, 7)
+            .toReversed()
+            .map((n) => ({
+              label: new Date(n.atMs).toLocaleDateString(sw ? 'sw-KE' : 'en-KE', { weekday: 'narrow' }),
+              hours: n.hours,
+            }))}
+          onPick={logNight}
+        />
+
         <section className="home-card">
           <h2>{tx('Asleep or unconscious', 'Usingizi au kupoteza fahamu')}</h2>
           <p className="hist-sub">
@@ -94,8 +114,9 @@ export function WellbeingPage() {
               type="button"
               className="btn btn-primary"
               onClick={() => {
-                endSleep();
+                const hours = endSleep();
                 setAsleep(false);
+                if (hours !== null) logNight(hours);
               }}
             >
               {tx('I am awake', 'Nimeamka')}
@@ -114,38 +135,6 @@ export function WellbeingPage() {
           )}
         </section>
 
-        <section className="home-card">
-          <h2>{tx('Last night', 'Usiku uliopita')}</h2>
-          <p className="hist-sub">{tx('Only what you tell Neema. She does not invent hours.', 'Uliyonena tu. Haundi saa.')}</p>
-          <div className="story__actions">
-            {[4, 6, 8].map((h) => (
-              <button key={h} type="button" className="btn btn-secondary btn-sm" onClick={() => logNight(h)}>
-                {tx(`${h} hours`, `masaa ${h}`)}
-              </button>
-            ))}
-          </div>
-          {nights.length ? (
-            <ul className="wb-lines">
-              {nights.slice(0, 7).map((n) => (
-                <li key={n.atMs}>
-                  {dshort(n.atMs)} · {tx(`${n.hours} hours`, `masaa ${n.hours}`)}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="hist-empty">{tx('No nights saved yet.', 'Bado hakuna usiku uliohifadhiwa.')}</p>
-          )}
-        </section>
-
-        <section className="home-card">
-          <h2>{tx('What the band is for', 'Bendi iko kwa nini')}</h2>
-          <p className="hist-sub">
-            {tx(
-              'Like a sleep ring, the useful part is the pattern: how long you rest, and that your heart and temperature settle while you do. Neema learns your usual from quiet minutes. She does not score your sleep, and she does not guess dream stages.',
-              'Kama pete ya usingizi, kinachofaa ni mwenendo: muda unaopumzika, na moyo na joto vinavyotulia. Neema hujifunza kawaida yako kutoka dakika za utulivu. Hatoi alama ya usingizi, na hakisi hatua za ndoto.',
-            )}
-          </p>
-        </section>
       </main>
     );
   }
@@ -154,6 +143,13 @@ export function WellbeingPage() {
     <main className="screen hist">
       <h1 className="screen-title">{tx('Sleep and mood', 'Usingizi na hisia')}</h1>
       <p className="screen-sub">{tx('From your daily check-ins. Only what you reported is shown.', 'Kutoka ukaguzi wako wa kila siku. Kinaonyeshwa ulichoripoti tu.')}</p>
+
+      <SleepNight
+        sw={sw}
+        hours={recentHours(nights) ?? (sleepRows.length && sleepRows[sleepRows.length - 1]!.sleep ? SLEEP_HOURS[sleepRows[sleepRows.length - 1]!.sleep!] : null)}
+        week={[]}
+        onPick={logNight}
+      />
 
       <section className="home-card">
         <div className="hist-head">
@@ -173,9 +169,9 @@ export function WellbeingPage() {
               {lowNights
                 ? tx(
                     `${lowNights} of ${sleepRows.length} nights with 4 hours or less. Broken sleep is common with a newborn; ask family to take a feed or chores so you can rest.`,
-                    `Usiku ${lowNights} kati ya ${sleepRows.length} ulilala saa 4 au chini. Usingizi wa vipande ni kawaida ukiwa na mtoto mchanga; omba familia isaidie ili upumzike.`,
+                    `Usiku ${lowNights} kati ya ${sleepRows.length} ulilala masaa 4 au chini. Usingizi wa vipande ni kawaida ukiwa na mtoto mchanga; omba familia isaidie ili upumzike.`,
                   )
-                : tx('You reported 5 hours or more on every night here.', 'Uliripoti saa 5 au zaidi kila usiku hapa.')}
+                : tx('You reported 5 hours or more on every night here.', 'Uliripoti masaa 5 au zaidi kila usiku hapa.')}
             </p>
             <p className="n-hint">{tx(`Latest: ${SLEEP_TEXT[sleepRows[sleepRows.length - 1]!.sleep!][0]}`, `Karibuni: ${SLEEP_TEXT[sleepRows[sleepRows.length - 1]!.sleep!][1]}`)}</p>
           </>
