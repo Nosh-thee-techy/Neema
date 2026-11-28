@@ -13,13 +13,13 @@ import { carePath, journeyPhase } from '../services/carePath';
 import { buildDailyStory, storyContext, type StorySlide } from '../services/dailyStory';
 import { loadBaseline } from '../services/baselineStore';
 import { loadProfile } from '../services/passport';
+import { StoryDeck } from '../ui/StoryDeck';
 import '../styles/story.css';
 
 export function StoryPage() {
   const nav = useNavigate();
   const { lang } = useLocale();
   const sw = lang === 'sw';
-  const tx = (en: string, s: string) => (sw ? s : en);
   const g = useGuardian();
   const today = useToday('story');
   const [slides, setSlides] = useState<StorySlide[]>([]);
@@ -55,58 +55,14 @@ export function StoryPage() {
     };
   }, [lang, today.stage, today.pregnancy?.weeks, today.pregnancy?.days, today.recovery?.daysSinceBirth, today.name, g.triage?.level, sw]);
 
-  const slide = slides[i];
-  const last = slide && i === slides.length - 1;
-
-  function goNext() {
-    if (!slide) return;
-    if (last) {
-      nav('/care', { state: { insight: storyContext(slides) } });
-      return;
-    }
-    setI((n) => n + 1);
-  }
-
   return (
-    <main className="story" data-step={i}>
-      <header className="story__top">
-        <button type="button" className="story__back" onClick={() => nav('/home')} aria-label={tx('Back to today', 'Rudi leo')}>
-          <span aria-hidden>←</span>
-        </button>
-        <p className="story__count">
-          {slides.length ? tx(`${i + 1} of ${slides.length}`, `${i + 1} kati ya ${slides.length}`) : ''}
-        </p>
-      </header>
-
-      {slide ? (
-        <article className="story__card" key={slide.id}>
-          <p className="story__kicker">{slide.kicker}</p>
-          <h1>{slide.title}</h1>
-          <p className="story__body">{slide.body}</p>
-        </article>
-      ) : (
-        <p className="story__body">{tx('Opening today’s cards…', 'Inafungua kadi za leo…')}</p>
-      )}
-
-      <footer className="story__foot">
-        <div className="story__dots" aria-hidden>
-          {slides.map((s, n) => (
-            <span key={s.id} data-on={n === i} />
-          ))}
-        </div>
-        <div className="story__actions">
-          {i > 0 ? (
-            <button type="button" className="btn btn-secondary" onClick={() => setI((n) => n - 1)}>
-              {tx('Back', 'Rudi')}
-            </button>
-          ) : (
-            <span />
-          )}
-          <button type="button" className="btn btn-primary" disabled={!slide} onClick={goNext}>
-            {slide?.next ?? tx('Next', 'Endelea')}
-          </button>
-        </div>
-      </footer>
-    </main>
+    <StoryDeck
+      slides={slides}
+      index={Math.min(i, Math.max(slides.length - 1, 0))}
+      sw={sw}
+      onBack={() => nav('/home')}
+      onIndex={setI}
+      onDone={() => nav('/care', { state: { insight: storyContext(slides) } })}
+    />
   );
 }
