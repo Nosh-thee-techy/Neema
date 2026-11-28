@@ -127,7 +127,35 @@ export function useSpeechDictation(lang: 'en' | 'sw' = 'en') {
           const value = opts?.mode === 'phone' ? digitsFromSpeech(raw) : raw;
           resolve(value || null);
         };
+        let triedEnglish = false;
         rec.onerror = (ev) => {
+          if (ev.error === 'language-not-supported' && !triedEnglish && rec.lang !== 'en-US') {
+            triedEnglish = true;
+            try {
+              const again = new Ctor();
+              recRef.current = again;
+              again.lang = 'en-US';
+              again.continuous = false;
+              again.interimResults = false;
+              again.maxAlternatives = 1;
+              again.onresult = rec.onresult;
+              again.onerror = (next) => {
+                if (next.error !== 'aborted' && next.error !== 'no-speech') {
+                  setError(
+                    lang === 'sw'
+                      ? 'Sikuskia vizuri. Jaribu tena karibu na mikrofoni.'
+                      : 'Could not hear clearly. Try again near the mic.',
+                  );
+                }
+                resolve(null);
+              };
+              again.onend = () => setListening(false);
+              again.start();
+              return;
+            } catch {
+              /* fall through */
+            }
+          }
           if (ev.error !== 'aborted' && ev.error !== 'no-speech') {
             setError(
               lang === 'sw'
