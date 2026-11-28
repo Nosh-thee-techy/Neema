@@ -5,6 +5,7 @@
 
 import type { Plugin } from 'vite';
 import { loadEnv } from 'vite';
+import { raiseToWoman, voiceForNeema, womanVoiceFallbacks } from '../../sautiVoice.mjs';
 
 async function readBody(req: import('http').IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
@@ -24,7 +25,7 @@ export function msingiTtsPlugin(): Plugin {
         /\/$/,
         '',
       );
-      const voice = (env.MSINGI_VOICE || process.env.MSINGI_VOICE || 'female').trim();
+      const voice = voiceForNeema(env.MSINGI_VOICE || process.env.MSINGI_VOICE);
 
       server.middlewares.use(async (req, res, next) => {
         if (req.method !== 'POST' || req.url?.split('?')[0] !== '/api/tts') {
@@ -46,24 +47,24 @@ export function msingiTtsPlugin(): Plugin {
             res.end(JSON.stringify({ error: 'text required' }));
             return;
           }
-          const payload: Record<string, string> = { text, voice };
+          const headers = {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          };
           let upstream = await fetch(`${baseUrl}/v1/audio/speech`, {
             method: 'POST',
-            headers: {
-              Authorization: `Bearer ${apiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload),
+            headers,
+            body: JSON.stringify({ text, voice }),
           });
           if (upstream.status === 422) {
-            upstream = await fetch(`${baseUrl}/v1/audio/speech`, {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ text }),
-            });
+            for (const alt of womanVoiceFallbacks(voice)) {
+              upstream = await fetch(`${baseUrl}/v1/audio/speech`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ text, voice: alt }),
+              });
+              if (upstream.ok) break;
+            }
           }
           if (!upstream.ok) {
             res.statusCode = upstream.status;
@@ -71,7 +72,7 @@ export function msingiTtsPlugin(): Plugin {
             res.end(JSON.stringify({ error: 'Voice service could not complete that turn.' }));
             return;
           }
-          const buf = Buffer.from(await upstream.arrayBuffer());
+          const buf = raiseToWoman(Buffer.from(await upstream.arrayBuffer()));
           res.statusCode = 200;
           res.setHeader('Content-Type', upstream.headers.get('content-type') || 'audio/wav');
           res.end(buf);
