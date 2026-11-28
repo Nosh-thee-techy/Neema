@@ -23,6 +23,7 @@ import { Segmented } from '../ui/Segmented';
 import { FieldError, FormField, RequiredMark, invalidProps } from '../ui/FormField';
 import { AllergyPicker, allergyLabel } from '../ui/AllergyPicker';
 import { TermsContent } from '../ui/TermsContent';
+import { VoiceFill } from '../ui/VoiceFill';
 import { useLocale } from '../hooks/useLocale';
 import { loadOnboarding, saveOnboarding } from '../hooks/useOnboarding';
 import {
@@ -541,7 +542,7 @@ export function RegisterPage() {
         </ol>
       </nav>
 
-      <section className="reg-card" aria-live="polite">
+      <section key={step} className="reg-card" aria-live="polite">
         {step === 'who' && (
           <>
             <h1 className="screen-title">{tx('Who is filling this in?', 'Nani anajaza fomu hii?')}</h1>
@@ -582,7 +583,10 @@ export function RegisterPage() {
             <h1 className="screen-title">{self ? tx('About you', 'Kuhusu wewe') : tx('About the mother', 'Kuhusu mama')}</h1>
             {legend}
             <FormField id="reg-full" label={self ? tx('Full name', 'Jina kamili') : tx("Mother's full name", 'Jina kamili la mama')} required error={msg('fullName')} hint={tx('As on the clinic card or ID.', 'Kama kwenye kadi ya kliniki au kitambulisho.')}>
-              <input id="reg-full" value={d.fullName} onChange={(e) => set('fullName', e.target.value)} autoComplete="name" {...invalidProps('reg-full', msg('fullName'))} />
+              <span className="reg-with-voice">
+                <input id="reg-full" value={d.fullName} onChange={(e) => set('fullName', e.target.value)} autoComplete="name" {...invalidProps('reg-full', msg('fullName'))} />
+                <VoiceFill lang={lang} onText={(v) => set('fullName', v)} />
+              </span>
             </FormField>
             <FormField
               id="reg-display"
@@ -590,7 +594,10 @@ export function RegisterPage() {
               optionalText={optional}
               hint={tx('Leave empty to use the first name.', 'Acha tupu kutumia jina la kwanza.')}
             >
-              <input id="reg-display" value={d.displayName} onChange={(e) => set('displayName', e.target.value)} placeholder={tx('e.g. Mama Wanjiru', 'mfano: Mama Wanjiru')} />
+              <span className="reg-with-voice">
+                <input id="reg-display" value={d.displayName} onChange={(e) => set('displayName', e.target.value)} placeholder={tx('e.g. Mama Wanjiru', 'mfano: Mama Wanjiru')} />
+                <VoiceFill lang={lang} onText={(v) => set('displayName', v)} />
+              </span>
             </FormField>
             <FormField
               id="reg-dob"
@@ -609,7 +616,10 @@ export function RegisterPage() {
               error={msg('phone')}
               hint={self ? why('So your CHP can call you back after an alert.', 'Ili CHP wako akupigie baada ya tahadhari.') : why('So her CHP can call her back after an alert.', 'Ili CHP wake ampigie baada ya tahadhari.')}
             >
-              <input id="reg-phone" type="tel" inputMode="tel" value={d.phone} onChange={(e) => set('phone', e.target.value)} placeholder="0712 345 678" autoComplete="tel" {...invalidProps('reg-phone', msg('phone'))} />
+              <span className="reg-with-voice">
+                <input id="reg-phone" type="tel" inputMode="tel" value={d.phone} onChange={(e) => set('phone', e.target.value)} placeholder="0712 345 678" autoComplete="tel" {...invalidProps('reg-phone', msg('phone'))} />
+                <VoiceFill lang={lang} mode="phone" onText={(v) => set('phone', v)} />
+              </span>
             </FormField>
             {!self && (
               <div className="field">
@@ -802,7 +812,10 @@ export function RegisterPage() {
             </FormField>
             <AllergyPicker idPrefix="reg-alg" lang={lang} value={d.allergies} onChange={(v) => set('allergies', v)} error={msg('allergies')} />
             <FormField id="reg-meds" label={tx('Medicines taken now', 'Dawa unazotumia sasa')}>
-              <input id="reg-meds" value={d.medications} onChange={(e) => set('medications', e.target.value)} placeholder={tx('e.g. iron, folic acid', 'mfano: madini ya chuma, foliki')} />
+              <span className="reg-with-voice">
+                <input id="reg-meds" value={d.medications} onChange={(e) => set('medications', e.target.value)} placeholder={tx('e.g. iron, folic acid', 'mfano: madini ya chuma, foliki')} />
+                <VoiceFill lang={lang} onText={(v) => set('medications', v)} />
+              </span>
             </FormField>
             <FormField id="reg-notes" label={self ? tx('Anything else your nurse should know', 'Lolote muuguzi anapaswa kujua') : tx("Mother's own notes", 'Maelezo ya mama mwenyewe')}>
               <textarea id="reg-notes" rows={3} value={d.healthNotes} onChange={(e) => set('healthNotes', e.target.value)} />

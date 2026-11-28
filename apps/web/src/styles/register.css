@@ -69,6 +69,7 @@
 }
 
 .reg-card {
+  animation: reg-rise 420ms cubic-bezier(0.22, 1, 0.36, 1);
   border-radius: var(--radius);
   background: var(--glass-strong);
   border: 1px solid var(--glass-edge);
@@ -80,6 +81,54 @@
 
 .reg-card .screen-title {
   margin-top: 0;
+}
+
+.reg-with-voice {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.reg-with-voice input,
+.reg-with-voice textarea {
+  flex: 1;
+  min-width: 0;
+}
+
+.reg-mic {
+  flex: none;
+  min-height: 44px;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff6ea;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.reg-mic[aria-pressed='true'] {
+  background: #8a5a32;
+  color: #fffaf3;
+  border-color: #8a5a32;
+}
+
+@keyframes reg-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reg-card {
+    animation: none;
+  }
 }
 
 .reg-label {
