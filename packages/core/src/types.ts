@@ -54,7 +54,9 @@ export type RuleId =
   | 'R14_SIGNAL_LOST_WITH_SYMPTOMS'
   | 'R15_EMERGENCY_SIGN'
   | 'R16_THOUGHTS_OF_HARM'
-  | 'R17_POSTPARTUM_REVIEW_SIGN';
+  | 'R17_POSTPARTUM_REVIEW_SIGN'
+  | 'R18_PULSE_FAST_AT_REST'
+  | 'R19_PULSE_RISING';
 
 /** Optional daily check-in. CONTEXT ONLY — rules never read it. */
 export interface CheckIn {
@@ -185,6 +187,11 @@ export interface TriageInput {
   markedResting: boolean;
   /** z-scores from the personal baseline. */
   baselineZ: { hr: number | null; temp: number | null };
+  /**
+   * Her settled pulse (bpm): a slow average over about a day, restarted at birth.
+   * Null until it has learned enough. Used only by R19, only when her plan switches it on.
+   */
+  hrReference?: number | null;
   /**
    * IANA timezone for sleep-window checks (e.g. Africa/Nairobi).
    * When omitted, sleep window uses UTC.

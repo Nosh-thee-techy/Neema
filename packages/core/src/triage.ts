@@ -27,7 +27,20 @@ export interface TriageConfig {
     persistMinutes: number;
   };
   fever: { tempC: number; windowMinutes: number };
-  pulse: { postpartumFastBpm: number; baselineZ: number };
+  pulse: {
+    postpartumFastBpm: number;
+    baselineZ: number;
+    /**
+     * R18: a resting pulse at or above this, held for slowRise.sustainMinutes, asks her to check.
+     * Null (off) in the general settings; her watch plan can switch it on. DRAFT.
+     */
+    restingFastBpm: number | null;
+    /**
+     * R19: pulse held this far above her settled pulse (the slow reference, not the
+     * fast baseline that re-learns within the hour). Off in the general settings. DRAFT.
+     */
+    slowRise: { enabled: boolean; bpmAboveReference: number; sustainMinutes: number };
+  };
   shockIndex: { referral: number; maxBpAgeMinutes: number };
   signal: { minValidFraction: number; staleMinutes: number };
   recheckMinutes: number;
@@ -184,6 +197,36 @@ export function evaluateTriage(
     });
   }
 
+  // R18 / R19 her watch plan: a pulse that stays fast at rest, or keeps climbing.
+  // Both read a sustained window, not one minute, and both only ask her to check (YELLOW).
+  const sustained = sustainedHr(input.vitals, input.nowMs, config.pulse.slowRise.sustainMinutes);
+  if (vitalsUsable && resting && sustained !== null) {
+    const fastLimit = config.pulse.restingFastBpm;
+    if (fastLimit !== null && sustained >= fastLimit) {
+      add({
+        level: 'YELLOW',
+        rule: 'R18_PULSE_FAST_AT_REST',
+        reason: 'pulse_fast_resting',
+        messageKey: 'yellow_pulse_baseline',
+        recheckInMinutes: config.recheckMinutes,
+      });
+    }
+    const ref = input.hrReference ?? null;
+    if (
+      config.pulse.slowRise.enabled &&
+      ref !== null &&
+      sustained - ref >= config.pulse.slowRise.bpmAboveReference
+    ) {
+      add({
+        level: 'YELLOW',
+        rule: 'R19_PULSE_RISING',
+        reason: 'pulse_rising',
+        messageKey: 'yellow_pulse_baseline',
+        recheckInMinutes: config.recheckMinutes,
+      });
+    }
+  }
+
   // R13 shock index (HR / systolic), resting + fresh BP only
   if (
     bpLatest &&
@@ -315,6 +358,16 @@ function resultOf(hits: PartialHit[], nowMs: number, configVersion: string): Tri
     result.recheckInMinutes = recheck.recheckInMinutes;
   }
   return result;
+}
+
+/**
+ * Mean heart rate over the last `minutes`, or null when fewer than 60% of those
+ * minutes carry a valid heart rate (a gap is not read as a calm pulse).
+ */
+function sustainedHr(vitals: VitalsMinute[], nowMs: number, minutes: number): number | null {
+  const inWindow = vitals.filter((v) => nowMs - v.tsMs <= minutes * MIN && v.hrMean !== null);
+  if (inWindow.length < Math.ceil(minutes * 0.6)) return null;
+  return inWindow.reduce((a, v) => a + (v.hrMean as number), 0) / inWindow.length;
 }
 
 function latestMinute(vitals: VitalsMinute[]): VitalsMinute | undefined {

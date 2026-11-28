@@ -35,6 +35,8 @@ export {
   parseVitalsPacket,
 } from './protocol.js';
 
+export { parseSensorPayload, sampleFromSensorPayload, type SensorReading } from './sensorReading.js';
+
 export {
   calibrateSkinTempC,
   evaluateTriage,
@@ -48,7 +50,10 @@ export {
   baselineProgress,
   createBaseline,
   normalRange,
+  REFERENCE_MIN_SAMPLES,
+  referenceValue,
   updateBaseline,
+  updateReference,
   zScore,
   type BaselineSignal,
   type BaselineState,
@@ -80,6 +85,21 @@ export {
   scoreEpds,
   type EpdsScore,
 } from './epds.js';
+
+export {
+  AFTER_BIRTH_WATCH_DAYS,
+  applyStricter,
+  bpCheckDue,
+  buildWatchPlan,
+  dueCheckNudge,
+  NUDGE_HOURS,
+  type WatchItem,
+  type WatchItemId,
+  type WatchPlan,
+  type WatchPlanInput,
+  type WatchReason,
+  type WatchTighten,
+} from './watchPlan.js';
 
 export { default as triageConfigJson } from './config/triage.config.json';
 export { default as swMessages } from './messages/sw.json';
