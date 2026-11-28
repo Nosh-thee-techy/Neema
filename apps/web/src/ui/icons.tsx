@@ -238,3 +238,14 @@ export function IconMoon() {
     </Svg>
   );
 }
+
+/** Settings cog: eight teeth around a hub. */
+export function IconSettings() {
+  return (
+    <Svg>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21M5.6 5.6l1.7 1.7M16.7 16.7l1.7 1.7M5.6 18.4l1.7-1.7M16.7 7.3l1.7-1.7" />
+      <circle cx="12" cy="12" r="6.6" />
+    </Svg>
+  );
+}

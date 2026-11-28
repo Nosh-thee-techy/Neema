@@ -7,7 +7,31 @@
   display: grid;
   gap: 0.75rem;
   margin-top: 1rem;
-  grid-template-columns: 1fr;
+  /* minmax(0, …): a wide child (a scrolling filter row) must not push the page past the phone's edge. */
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.bento__main > *,
+.bento__side > * {
+  min-width: 0;
+}
+
+/* Band page, not connected: the two ways to connect, stacked, above the readings. */
+.band-connect {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.band-connect .soft-note {
+  margin: 0;
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .band-connect {
+    max-width: 420px;
+  }
 }
 
 .bento__head {

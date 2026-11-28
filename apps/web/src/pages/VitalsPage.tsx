@@ -69,6 +69,24 @@ export function VitalsPage() {
       </h1>
       <p className="screen-sub">{presence}</p>
 
+      {/* Not connected: the way to connect comes first, before any empty readings. */}
+      {!g.connected ? (
+        <div className="band-connect">
+          {/* Her real band is the main action. The practice band is named as practice. */}
+          <Button variant="primary" onClick={() => void g.connectBluetooth()}>
+            {t('connect_band')}
+          </Button>
+          <Button variant="secondary" onClick={() => void g.connectSimulator()}>
+            {t('start_watch')}
+          </Button>
+          <p className="soft-note">
+            {lang === 'sw'
+              ? 'Huna bendi bado? Bendi ya mazoezi inaonyesha vipimo vya mfano, si vyako halisi.'
+              : 'No band yet? The practice band shows example readings, not your real ones.'}
+          </p>
+        </div>
+      ) : null}
+
       <div className="bento">
         <div className="bento__kpis" role="group" aria-label={lang === 'sw' ? 'Vipimo vya bendi' : 'Band readings'}>
           <KpiTile
@@ -92,7 +110,7 @@ export function VitalsPage() {
             label={lang === 'sw' ? 'Joto' : 'Temp'}
             value={temp === null ? '—' : temp.toFixed(1)}
             unit={temp === null ? undefined : '°'}
-            note={lang === 'sw' ? 'Homa ≥38°' : 'Fever ≥38°'}
+            note={temp === null ? presence : lang === 'sw' ? 'Homa kuanzia 38°' : 'Fever from 38°'}
             tone={tempTone}
             spark={tempSpark}
             icon={<IconTemp />}
@@ -137,22 +155,11 @@ export function VitalsPage() {
             show={['hr', 'temp', 'signal', 'battery']}
           />
 
-          <div className="btn-row" style={{ margin: 0, flexDirection: 'column' }}>
-            {!g.connected ? (
-              <>
-                <Button variant="primary" onClick={() => void g.connectSimulator()}>
-                  {t('start_watch')}
-                </Button>
-                <Button variant="secondary" onClick={() => void g.connectBluetooth()}>
-                  {t('connect_band')}
-                </Button>
-              </>
-            ) : (
-              <Button variant="secondary" onClick={() => void g.disconnect()}>
-                {lang === 'sw' ? 'Achana na bendi' : 'Disconnect band'}
-              </Button>
-            )}
-          </div>
+          {g.connected ? (
+            <Button variant="secondary" onClick={() => void g.disconnect()}>
+              {lang === 'sw' ? 'Achana na bendi' : 'Disconnect band'}
+            </Button>
+          ) : null}
         </aside>
 
         <div className="bento__trend">

@@ -14,17 +14,18 @@ export function SymptomsPage() {
   const nav = useNavigate();
   const { t, lang } = useLocale();
   const [selected, setSelected] = useState<SymptomCode[]>([]);
-  const [showMap, setShowMap] = useState(true);
+  // The word list comes first: it is the quickest to read. The body picture is one tap away.
+  const [showMap, setShowMap] = useState(false);
 
   const options: { code: SymptomCode; label: string }[] =
     lang === 'sw'
       ? [
-          { code: 'headache', label: 'Kichwa' },
-          { code: 'blurred_vision', label: 'Kuona vizuri hapana' },
+          { code: 'headache', label: 'Kichwa kinauma' },
+          { code: 'blurred_vision', label: 'Kutoona vizuri' },
           { code: 'upper_abdominal_pain', label: 'Maumivu juu ya tumbo' },
           { code: 'heavy_bleeding', label: 'Kutokwa damu nyingi' },
           { code: 'fever_chills', label: 'Homa / baridi' },
-          { code: 'baby_moving_less', label: 'Mtoto anatembea kidogo' },
+          { code: 'baby_moving_less', label: 'Mtoto anasonga kidogo' },
           { code: 'swelling_face_hands', label: 'Uvimbe uso/mikono' },
           { code: 'low_mood', label: 'Hali mbaya ya moyo' },
           { code: 'other', label: 'Nyingine' },
@@ -70,26 +71,8 @@ export function SymptomsPage() {
         {t('how_feel')}
       </h1>
       <p className="screen-sub">
-        {lang === 'sw' ? 'Gusa yote yanayokufaa — au tumia ramani ya mwili.' : 'Tap everything that fits — or use the body map.'}
+        {lang === 'sw' ? 'Gusa kila unachohisi leo. Unaweza kuchagua zaidi ya kimoja.' : 'Tap everything you feel today. You can choose more than one.'}
       </p>
-
-      <div className="btn-row" style={{ marginBottom: '0.75rem' }}>
-        <Button variant="ghost" onClick={() => setShowMap((v) => !v)}>
-          {showMap
-            ? lang === 'sw'
-              ? 'Ficha ramani'
-              : 'Hide body map'
-            : lang === 'sw'
-              ? 'Onyesha ramani'
-              : 'Show body map'}
-        </Button>
-      </div>
-
-      {showMap ? (
-        <div className="panel" style={{ marginBottom: '1rem' }}>
-          <BodyMap selected={selected} onToggleCodes={toggleCodes} lang={lang} />
-        </div>
-      ) : null}
 
       <div className="chip-grid">
         {options.map((opt) => (
@@ -104,6 +87,24 @@ export function SymptomsPage() {
           </button>
         ))}
       </div>
+
+      <div className="btn-row" style={{ margin: '1rem 0 0.75rem' }}>
+        <Button variant="ghost" aria-expanded={showMap} onClick={() => setShowMap((v) => !v)}>
+          {showMap
+            ? lang === 'sw'
+              ? 'Ficha picha ya mwili'
+              : 'Hide the body picture'
+            : lang === 'sw'
+              ? 'Au onyesha kwenye picha ya mwili'
+              : 'Or point on a body picture'}
+        </Button>
+      </div>
+
+      {showMap ? (
+        <div className="panel">
+          <BodyMap selected={selected} onToggleCodes={toggleCodes} lang={lang} />
+        </div>
+      ) : null}
       {selected.includes('low_mood') ? (
         <div className="panel" style={{ marginTop: '1rem' }}>
           <strong>{t('epds_title')}</strong>
@@ -111,7 +112,7 @@ export function SymptomsPage() {
             {t('epds_sub')}
           </p>
           <Button variant="secondary" style={{ width: '100%' }} onClick={() => nav('/epds')}>
-            {lang === 'sw' ? 'Fungua EPDS' : 'Open EPDS'}
+            {lang === 'sw' ? 'Jibu maswali ya hisia' : 'Answer the mood questions'}
           </Button>
         </div>
       ) : null}

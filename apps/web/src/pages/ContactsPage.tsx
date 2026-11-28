@@ -145,27 +145,27 @@ export function ContactsPage() {
       </div>
       <p className="screen-sub" style={{ marginTop: '0.5rem' }}>
         {sw
-          ? 'Hali ikiwa mbaya, Neema inaandaa SMS kwa CHP wako kwanza, kisha familia, kisha msimamizi wa CHP.'
-          : 'When something is wrong, Neema prepares an SMS for your CHP first, then family, then the CHP supervisor.'}
+          ? 'Neema akiona dalili ya hatari, anaandaa ujumbe (SMS) kwa mhudumu wako wa afya ya jamii (CHP) kwanza, kisha familia, kisha msimamizi wa CHP. Wewe unabonyeza kutuma.'
+          : 'If Neema sees a warning sign, she gets a text message ready for your community health promoter (CHP) first, then your family, then the CHP’s supervisor. You press send.'}
       </p>
 
       <div className="bento">
-      <div className="bento__kpis summary-row" role="group" aria-label={sw ? 'Muhtasari' : 'Summary'}>
-        <div className="summary-tile">
-          <b>{items.length}</b>
-          <span>{sw ? 'Watu' : 'People'}</span>
-        </div>
-        <div className="summary-tile" data-tone={hasRealChp ? 'ok' : 'warn'}>
-          <b>{usable.length}</b>
-          <span>{sw ? 'Tayari' : 'Ready'}</span>
-        </div>
-        <div className="summary-tile" data-tone={placeholders.length ? 'warn' : undefined}>
-          <b>{placeholders.length}</b>
-          <span>{sw ? 'Za mfano' : 'Sample'}</span>
-        </div>
-      </div>
+      {/* One plain sentence instead of counters: can an alert reach someone or not? */}
+      {!busy ? (
+        <p className="people-status" data-tone={hasRealChp ? 'ok' : 'warn'} role="status">
+          {hasRealChp
+            ? sw
+              ? `Watu ${usable.length} watapata tahadhari zako.`
+              : usable.length === 1
+                ? '1 person will get your alerts.'
+                : `${usable.length} people will get your alerts.`
+            : sw
+              ? 'Bado hakuna namba ya CHP. Ongeza moja ili tahadhari imfikie mhudumu wa afya.'
+              : 'No CHP number yet. Add one so an alert can reach a health worker.'}
+        </p>
+      ) : null}
 
-      <div className="bento__main" style={{ gridTemplateColumns: adding ? undefined : '1fr' }}>
+      <div className="bento__main" style={{ gridTemplateColumns: adding ? undefined : 'minmax(0, 1fr)' }}>
       <div>
       {placeholders.length > 0 ? (
         <div className="panel contact-warning" role="alert" style={{ marginBottom: '1rem' }}>
@@ -215,8 +215,17 @@ export function ContactsPage() {
               <span className="people__name">
                 {c.name}
                 <small>
-                  #{c.escalationOrder}
-                  {first ? (sw ? ' · anapokea kwanza' : ' · alerted first') : firstIds.has(c.id) ? (sw ? ' · SMS ya kwanza' : ' · first SMS') : ''}
+                  {first
+                    ? sw
+                      ? 'Anapata tahadhari kwanza'
+                      : 'Gets the alert first'
+                    : firstIds.has(c.id)
+                      ? sw
+                        ? 'Anapata tahadhari mara moja pia'
+                        : 'Also gets the alert straight away'
+                      : sw
+                        ? `Wa ${c.escalationOrder} kwenye orodha`
+                        : `Number ${c.escalationOrder} in line`}
                 </small>
               </span>
               <span className="people__meta">

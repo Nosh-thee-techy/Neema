@@ -18,8 +18,16 @@ export function EmergencyHoldButton({ lang, onTrigger }: EmergencyHoldButtonProp
   const startRef = useRef<number | null>(null);
   const frameRef = useRef<number | null>(null);
   const firedRef = useRef(false);
+  const [tapHint, setTapHint] = useState(false);
+  const hintTimer = useRef<number | null>(null);
 
   const stop = () => {
+    // Let go too early: say how long to hold, so a quick tap is never a dead end.
+    if (startRef.current !== null && !firedRef.current) {
+      setTapHint(true);
+      if (hintTimer.current) window.clearTimeout(hintTimer.current);
+      hintTimer.current = window.setTimeout(() => setTapHint(false), 2500);
+    }
     startRef.current = null;
     if (frameRef.current) cancelAnimationFrame(frameRef.current);
     frameRef.current = null;
@@ -45,15 +53,24 @@ export function EmergencyHoldButton({ lang, onTrigger }: EmergencyHoldButtonProp
 
   const start = () => {
     if (startRef.current !== null || firedRef.current) return;
+    setTapHint(false);
     startRef.current = performance.now();
     frameRef.current = requestAnimationFrame(tick);
   };
 
-  useEffect(() => stop, []);
+  useEffect(
+    () => () => {
+      startRef.current = null;
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+      if (hintTimer.current) window.clearTimeout(hintTimer.current);
+    },
+    [],
+  );
 
   const holding = progress > 0 && progress < 1;
-  const line1 = progress >= 1 ? (sw ? 'Inapiga…' : 'Calling…') : holding ? (sw ? 'Endelea kushikilia' : 'Keep holding') : sw ? 'SHIKILIA' : 'HOLD';
-  const line2 = sw ? '999 + CHP' : '999 + CHP';
+  // Say what it is first ("Emergency"), then how to use it. No abbreviations.
+  const line1 = progress >= 1 ? (sw ? 'Inapiga…' : 'Calling…') : holding ? (sw ? 'Endelea…' : 'Keep holding') : sw ? 'Dharura' : 'Emergency';
+  const line2 = tapHint ? (sw ? 'Shikilia sekunde 2' : 'Hold 2 seconds') : sw ? 'Shikilia kupiga' : 'Hold to call';
 
   return (
     <button
@@ -61,6 +78,7 @@ export function EmergencyHoldButton({ lang, onTrigger }: EmergencyHoldButtonProp
       className="sos-hold"
       data-testid="sos-button"
       data-holding={holding}
+      data-hint={tapHint}
       aria-label={
         sw
           ? 'Dharura: shikilia sekunde 2 kupiga 999 na kumjulisha CHP wako'

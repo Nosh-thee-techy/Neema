@@ -97,7 +97,7 @@ export function VitalRings({ lang, sample, connected, trend, triage, lastBp = nu
         fraction={temp === null ? null : (temp - 35) / 5}
         tone={tempTone(temp, triage)}
         icon={<IconTemp />}
-        note={`${sw(lang, 'homa', 'fever')} ≥${fmt(config.fever.tempC, 1)}`}
+        note={`${sw(lang, 'homa kuanzia', 'fever from')} ${fmt(config.fever.tempC, 1)}°`}
         onClick={onOpen ? () => onOpen('temp') : undefined}
       />
     ),
@@ -186,7 +186,11 @@ export function TonightCard({ lang, sample, connected, trend }: TonightProps) {
       <header className="tonight__head">
         <h2 className="tonight__title">{sw(lang, 'Usiku huu', 'Tonight')}</h2>
         <span className="tonight__live" data-on={hr !== null}>
-          {hr !== null ? sw(lang, 'Moja kwa moja', 'Live') : sw(lang, 'Imesimama', 'Paused')}
+          {hr !== null
+            ? sw(lang, 'Moja kwa moja', 'Live')
+            : connected
+              ? sw(lang, 'Inasubiri bendi', 'Waiting for band')
+              : sw(lang, 'Bendi haijaunganishwa', 'Band not connected')}
         </span>
       </header>
       <NormalArc
@@ -208,8 +212,8 @@ export function TonightCard({ lang, sample, connected, trend }: TonightProps) {
             )
           : sw(
               lang,
-              `Neema bado inajifunza kawaida yako (${learningPct}% ya siku 3). Hadi hapo, kanuni za kawaida pekee ndizo zinatumika.`,
-              `Neema is still learning your normal (${learningPct}% of 3 days). Until then, only the fixed rules apply.`,
+              `Neema bado anajifunza kawaida yako. Inachukua kama siku 3 za kuvaa bendi. Hadi hapo, anatumia viwango vya usalama vya kila mama.`,
+              `Neema is still learning what is normal for you. This takes about 3 days of wearing the band. Until then she uses the same safety limits for every mother.`,
             )}
       </p>
       {!band ? (
@@ -219,7 +223,7 @@ export function TonightCard({ lang, sample, connected, trend }: TonightProps) {
       ) : null}
       <dl className="tonight__stats">
         <div>
-          <dt>{sw(lang, 'Kawaida yako', 'Your normal')}</dt>
+          <dt>{band ? sw(lang, 'Kawaida yako', 'Your normal') : sw(lang, 'Imejifunza', 'Learned so far')}</dt>
           <dd>{band ? `${fmt(band.low)}–${fmt(band.high)}` : `${learningPct}%`}</dd>
         </div>
         <div>
@@ -227,7 +231,7 @@ export function TonightCard({ lang, sample, connected, trend }: TonightProps) {
           <dd>{temp === null ? '—' : `${fmt(temp, 1)}°`}</dd>
         </div>
         <div>
-          <dt>{sw(lang, 'Dakika saa hii', 'Minutes this hour')}</dt>
+          <dt>{sw(lang, 'Dakika zilizosomwa saa hii', 'Minutes read this hour')}</dt>
           <dd>{validMinutes}</dd>
         </div>
       </dl>

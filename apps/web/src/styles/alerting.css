@@ -18,6 +18,13 @@
   margin-top: 0.3rem;
 }
 
+/* Shown where the SMS buttons will appear, while the message is still being built. */
+.sms-preparing {
+  margin: 0.75rem 0;
+  text-align: center;
+  font-weight: 600;
+}
+
 /* Interactive alert ritual */
 .alert-page[data-mounted='true'] .alert-card,
 .alert-page[data-mounted='true'] .ritual-steps,

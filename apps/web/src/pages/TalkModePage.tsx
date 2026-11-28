@@ -24,30 +24,30 @@ export function TalkModePage() {
       </h1>
       <p className="screen-sub">
         {lang === 'sw'
-          ? 'Chagua ishara au maandishi. Unaweza kubadilisha baadaye.'
-          : 'Choose sign or written language. You can change later.'}
+          ? 'Chagua lugha ya ishara au maneno kwenye skrini. Unaweza kubadilisha baadaye kwenye Mipangilio.'
+          : 'Choose sign language or words on the screen. You can change this later in Settings.'}
       </p>
 
       <div className="talk-mode__choices" role="group" aria-label={lang === 'sw' ? 'Njia ya mazungumzo' : 'Talk mode'}>
         <button type="button" className="btn btn-primary talk-mode__choice" onClick={() => nav('/sign')}>
           <span className="talk-mode__choice-title">
-            {lang === 'sw' ? 'Ishara' : 'Sign'}
+            {lang === 'sw' ? 'Lugha ya ishara' : 'Sign language'}
           </span>
           <span className="talk-mode__choice-blurb">
             {lang === 'sw'
-              ? 'Mtu anayefanya ishara na majibu chini. Utafiti wa ASL — si KSL.'
-              : 'Signing figure with answers underneath. Research ASL — not KSL.'}
+              ? 'Mtu anayefanya ishara, na maneno chini yake. Kwa sasa ni Lugha ya Ishara ya Marekani. Ya Kenya bado haiko tayari.'
+              : 'A signing figure with the words underneath. For now it uses American Sign Language. Kenyan Sign Language is not ready yet.'}
           </span>
         </button>
 
         <button type="button" className="btn btn-secondary talk-mode__choice" onClick={() => nav('/home')}>
           <span className="talk-mode__choice-title">
-            {lang === 'sw' ? 'Lugha (maandishi)' : 'Language (text)'}
+            {lang === 'sw' ? 'Maneno kwenye skrini' : 'Words on the screen'}
           </span>
           <span className="talk-mode__choice-blurb">
             {lang === 'sw'
-              ? 'Endelea kwa Kiswahili au Kiingereza kwenye skrini.'
-              : 'Continue in Kiswahili or English on screen.'}
+              ? 'Soma na usikilize kwa Kiswahili au Kiingereza.'
+              : 'Read and listen in Kiswahili or English.'}
           </span>
         </button>
       </div>

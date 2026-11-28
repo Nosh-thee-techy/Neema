@@ -47,8 +47,8 @@ const COPY: Dict = {
     sw: 'Tulivu. Pumzika unapoweza.',
   },
   start_watch: {
-    en: 'Begin watching',
-    sw: 'Anza kulinda',
+    en: 'Try a practice band',
+    sw: 'Jaribu bendi ya mazoezi',
   },
   connect_band: {
     en: 'Connect your band',

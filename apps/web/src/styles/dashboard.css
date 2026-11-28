@@ -501,6 +501,22 @@ button.ring:focus-visible {
   margin: 0;
 }
 
+/* Your people: one sentence that says whether an alert can reach someone. */
+.people-status {
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+  border-radius: 14px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1f5a3d;
+  background: rgba(63, 157, 110, 0.14);
+}
+
+.people-status[data-tone='warn'] {
+  color: #7a4a05;
+  background: rgba(247, 169, 59, 0.22);
+}
+
 .summary-tile {
   border-radius: 18px;
   background: var(--glass-strong);

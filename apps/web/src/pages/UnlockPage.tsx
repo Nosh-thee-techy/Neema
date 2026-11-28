@@ -4,7 +4,9 @@ import { Button } from '../ui/Button';
 import { BrandMark } from '../ui/BrandMark';
 import { LangToggle } from '../ui/LangToggle';
 import { useLocale } from '../hooks/useLocale';
+import { saveOnboarding } from '../hooks/useOnboarding';
 import { getAuthMeta, setPin, unlockWithPin } from '../services/auth';
+import { db } from '../storage/db';
 import { PinInput } from '../ui/PinInput';
 import { LoadingScreen } from '../ui/LoadingScreen';
 
@@ -24,6 +26,26 @@ export function UnlockPage() {
   const [error, setError] = useState<string | null>(null);
   /** Bumps to remount the boxes (re-focus) after a reset. */
   const [round, setRound] = useState(0);
+  const [confirmWipe, setConfirmWipe] = useState(false);
+
+  /** Wipe local data when the PIN is forgotten — same phone only, no cloud account. */
+  async function startOver() {
+    setBusy(true);
+    try {
+      await db.delete();
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch {
+        /* storage may be unavailable */
+      }
+      saveOnboarding({ orientationDone: false, consentDone: false });
+      window.location.assign('/start');
+    } catch {
+      setBusy(false);
+      setError(tx('Could not clear this phone. Try again.', 'Imeshindwa kufuta data. Jaribu tena.'));
+    }
+  }
 
   useEffect(() => {
     void getAuthMeta().then((meta) => {
@@ -193,6 +215,28 @@ export function UnlockPage() {
             >
               {tx('Start again', 'Anza upya')}
             </button>
+          ) : null}
+          {mode === 'unlock' && !changing ? (
+            confirmWipe ? (
+              <div className="auth-card__wipe">
+                <p className="auth-card__wipe-copy">
+                  {tx(
+                    'This clears Neema data on this phone so you can register again. There is no way to recover a forgotten PIN.',
+                    'Hii itafuta data ya Neema kwenye simu hii ili uweze kujisajili tena. Hakuna njia ya kurejesha PIN iliyosahaulika.',
+                  )}
+                </p>
+                <Button type="button" variant="primary" className="auth-card__submit" disabled={busy} onClick={() => void startOver()}>
+                  {busy ? tx('Please wait…', 'Subiri…') : tx('Yes, start over', 'Ndiyo, anza upya')}
+                </Button>
+                <button type="button" className="btn btn-ghost btn-sm btn-block" disabled={busy} onClick={() => setConfirmWipe(false)}>
+                  {tx('Cancel', 'Ghairi')}
+                </button>
+              </div>
+            ) : (
+              <button type="button" className="btn btn-ghost btn-sm btn-block" onClick={() => setConfirmWipe(true)}>
+                {tx('Forgot PIN? Start over on this phone', 'Umesahau PIN? Anza upya kwenye simu hii')}
+              </button>
+            )
           ) : null}
         </form>
 

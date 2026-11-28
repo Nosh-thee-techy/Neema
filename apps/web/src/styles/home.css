@@ -85,8 +85,7 @@
 }
 
 .sos-hold__text strong {
-  font-size: 0.82rem;
-  letter-spacing: 0.06em;
+  font-size: 0.86rem;
   font-weight: 850;
 }
 
@@ -548,7 +547,8 @@ svg.read-row__spark[data-tone='alert'] polyline {
 }
 
 @media (max-width: 370px) {
-  .sos-hold__text small {
+  /* Narrow phones: the hint line only appears after a tap that was too short. */
+  .sos-hold:not([data-hint='true']) .sos-hold__text small {
     display: none;
   }
   .sos-hold {
