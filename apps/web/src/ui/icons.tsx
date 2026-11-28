@@ -239,6 +239,59 @@ export function IconMoon() {
   );
 }
 
+/** A drop, for “drink water”. */
+export function IconWater() {
+  return (
+    <Svg>
+      <path d="M12 3.5 6.8 11a5.2 5.2 0 1 0 10.4 0L12 3.5Z" />
+    </Svg>
+  );
+}
+
+/** Lying down, for rest. */
+export function IconRest() {
+  return (
+    <Svg>
+      <path d="M3.5 18.5h17" />
+      <circle cx="7" cy="8" r="2" />
+      <path d="M9.2 9.6 16.5 12.2c.8.3 1.2 1 1 1.8" />
+      <path d="M14.2 12.6 16 17" />
+    </Svg>
+  );
+}
+
+/** Slow breath: two rising curves. */
+export function IconBreath() {
+  return (
+    <Svg>
+      <path d="M3.5 15c2.2-5 4.2-5 6.4 0s4.2 5 6.4 0 4.2-5 4.2 0" />
+      <path d="M3.5 9.5c2.2-4 4.2-4 6.4 0s4.2 4 6.4 0" />
+    </Svg>
+  );
+}
+
+/** On her side. */
+export function IconSide() {
+  return (
+    <Svg>
+      <circle cx="8" cy="7.5" r="2.1" />
+      <path d="M6.2 18.5c.2-3.2 1.4-5.2 3.6-6.2 2.2-1 5.4-1.1 8.2-.4" />
+      <path d="M14.5 12.4 17.2 16" />
+    </Svg>
+  );
+}
+
+/** Open hand, for sign language. */
+export function IconHands() {
+  return (
+    <Svg>
+      <path d="M8 11.2V6.6a1.25 1.25 0 0 1 2.5 0v4.6" />
+      <path d="M10.5 10.4V5.6a1.25 1.25 0 0 1 2.5 0V11" />
+      <path d="M13 10.8V7.4a1.25 1.25 0 0 1 2.5 0V13c0 3.2-2.1 5.5-5.4 5.5-2.8 0-4.8-1.7-4.8-4.4V9a1.25 1.25 0 0 1 2.5 0" />
+    </Svg>
+  );
+}
+
 /** Settings cog: eight teeth around a hub. */
 export function IconSettings() {
   return (
