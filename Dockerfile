@@ -23,6 +23,9 @@ COPY --from=build /repo/apps/web/dist ./dist
 COPY apps/web/server.mjs ./server.mjs
 COPY apps/web/signPlanServer.mjs ./signPlanServer.mjs
 COPY apps/web/careChatServer.mjs ./careChatServer.mjs
+COPY apps/web/notifyServer.mjs ./notifyServer.mjs
+COPY apps/web/sautiVoice.mjs ./sautiVoice.mjs
+COPY apps/web/readingsServer.mjs ./readingsServer.mjs
 COPY packages/core/src/careCards.who.json ./careCards.who.json
 EXPOSE 8080
 CMD ["node", "server.mjs"]

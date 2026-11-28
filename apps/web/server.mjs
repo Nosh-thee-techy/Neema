@@ -9,13 +9,16 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FALLBACK_ORDER, planSignOrder } from './signPlanServer.mjs';
 import { planCareChat } from './careChatServer.mjs';
+import { handleVoice, noticesConfigured, phoneFromCallback, placeNotices } from './notifyServer.mjs';
+import { raiseToWoman, voiceForNeema, womanVoiceFallbacks } from './sautiVoice.mjs';
+import { fetchLatestReading } from './readingsServer.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.join(__dirname, 'dist');
 const PORT = Number(process.env.PORT || 8080);
 const API_KEY = (process.env.MSINGI_API_KEY || '').trim();
 const BASE_URL = (process.env.MSINGI_BASE_URL || 'https://api.msingiai.com').replace(/\/$/, '');
-const VOICE = (process.env.MSINGI_VOICE || 'female').trim();
+const VOICE = voiceForNeema(process.env.MSINGI_VOICE);
 const LLM_KEY = (
   process.env.OPENROUTER_API_KEY ||
   process.env.CARELOOP_LLM_API_KEY ||
@@ -64,30 +67,31 @@ async function handleTts(req, res) {
       res.end(JSON.stringify({ error: 'text required' }));
       return;
     }
+    const headers = {
+      Authorization: `Bearer ${API_KEY}`,
+      'Content-Type': 'application/json',
+    };
     let upstream = await fetch(`${BASE_URL}/v1/audio/speech`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${API_KEY}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({ text, voice: VOICE }),
     });
     if (upstream.status === 422) {
-      upstream = await fetch(`${BASE_URL}/v1/audio/speech`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text }),
-      });
+      for (const voice of womanVoiceFallbacks(VOICE)) {
+        upstream = await fetch(`${BASE_URL}/v1/audio/speech`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ text, voice }),
+        });
+        if (upstream.ok) break;
+      }
     }
     if (!upstream.ok) {
       res.writeHead(upstream.status, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Voice service could not complete that turn.' }));
       return;
     }
-    const buf = Buffer.from(await upstream.arrayBuffer());
+    const buf = raiseToWoman(Buffer.from(await upstream.arrayBuffer()));
     res.writeHead(200, {
       'Content-Type': upstream.headers.get('content-type') || 'audio/wav',
       'Content-Length': buf.length,
@@ -166,6 +170,49 @@ const server = http.createServer((req, res) => {
     void handleSignPlan(req, res);
     return;
   }
+  if ((req.method === 'GET' || req.method === 'POST') && pathOnly === '/api/calls/voice') {
+    void (async () => {
+      const raw = req.method === 'POST' ? await readBody(req) : '';
+      const query = Object.fromEntries(new URL(req.url || '', 'http://localhost').searchParams);
+      res.writeHead(200, { 'Content-Type': 'application/xml' });
+      res.end(handleVoice(phoneFromCallback(query, raw)));
+    })();
+    return;
+  }
+  if (req.method === 'POST' && pathOnly === '/api/notify') {
+    void (async () => {
+      try {
+        if (!noticesConfigured()) {
+          res.writeHead(503, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ configured: false, callsPlaced: 0, smsSent: 0 }));
+          return;
+        }
+        const raw = await readBody(req);
+        const body = JSON.parse(raw || '{}');
+        const result = await placeNotices(body);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch {
+        res.writeHead(502, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ configured: true, callsPlaced: 0, smsSent: 0 }));
+      }
+    })();
+    return;
+  }
+  if (req.method === 'GET' && pathOnly === '/api/readings') {
+    void (async () => {
+      try {
+        const query = Object.fromEntries(new URL(req.url || '', 'http://localhost').searchParams);
+        const result = await fetchLatestReading(query.device_id);
+        res.writeHead(result.status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result.body));
+      } catch {
+        res.writeHead(502, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'The readings database could not be reached.' }));
+      }
+    })();
+    return;
+  }
   if (req.method === 'POST' && pathOnly === '/api/care-chat') {
     void (async () => {
       try {
@@ -196,6 +243,6 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(
-    `Neema listening on :${PORT} (Msingi ${API_KEY ? 'on' : 'off'}, sign-plan ${LLM_KEY ? 'on' : 'off'})`,
+    `Neema listening on :${PORT} (Msingi ${API_KEY ? 'on' : 'off'}, sign-plan ${LLM_KEY ? 'on' : 'off'}, calls ${noticesConfigured() ? 'on' : 'off'})`,
   );
 });
