@@ -149,8 +149,15 @@ interface GuardianState {
   refreshTriage: (sos?: boolean) => Promise<TriageResult | null>;
   /** Clears RED. Only a CHP reply, the mother on her way, or a clinician may do this. */
   acknowledgeActiveRed: (by: AcknowledgedBy) => Promise<void>;
-  /** App SOS (R9). The band's 3 s long-press does the same. */
+  /** App SOS (R9). The on-screen hold still sends for help on the first hold. */
   pressSos: () => Promise<TriageResult | null>;
+  /**
+   * The band's first long-press only asks. A second one, or confirmBandSos, sends for help.
+   * dismissBandSos treats it as a mistake and does not alert anyone.
+   */
+  bandSosAsk: boolean;
+  confirmBandSos: () => Promise<TriageResult | null>;
+  dismissBandSos: () => void;
   /** Records that the mother opened one SMS link; in demo mode schedules the CHP reply. */
   markSmsOpened: (contactId: string) => void;
   /** Demo mode: seed a scripted scenario step and run the full chain. */
@@ -208,6 +215,14 @@ export function GuardianProvider({ children }: { children: ReactNode }) {
   const [lastChainNote, setLastChainNote] = useState<string | null>(null);
   const [recheck, setRecheck] = useState<RecheckState>(recheckRef.current.getState());
   const [recheckDueInSec, setRecheckDueInSec] = useState<number | null>(null);
+  const [bandSosAsk, setBandSosAsk] = useState(false);
+  /** True while the on-screen Emergency hold is the one raising SOS. */
+  const phoneSosRef = useRef(false);
+  /** True after the band's first long-press, until she confirms or dismisses. */
+  const bandAskRef = useRef(false);
+  const prevBandSos = useRef(false);
+  /** Ignore the band flag until this time after she says it was a mistake. */
+  const ignoreBandSosUntil = useRef(0);
 
   const bindBand = useCallback((band: BandSource) => {
     unsubRef.current?.();
@@ -215,7 +230,23 @@ export function GuardianProvider({ children }: { children: ReactNode }) {
     unsubRef.current = band.onVitals(async (s) => {
       setSample(s);
       await pipelineRef.current.ingest(s);
-      await refreshRef.current(s.sos);
+      const rising = s.sos && !prevBandSos.current;
+      prevBandSos.current = s.sos;
+      const suppressed = Date.now() < ignoreBandSosUntil.current;
+      if (rising && !phoneSosRef.current && !suppressed) {
+        if (bandAskRef.current) {
+          bandAskRef.current = false;
+          setBandSosAsk(false);
+          await refreshRef.current(true);
+          return;
+        }
+        bandAskRef.current = true;
+        setBandSosAsk(true);
+        await refreshRef.current(false);
+        return;
+      }
+      const sosForRules = !suppressed && (phoneSosRef.current || (s.sos && !bandAskRef.current));
+      await refreshRef.current(sosForRules);
     });
   }, []);
 
@@ -603,9 +634,27 @@ export function GuardianProvider({ children }: { children: ReactNode }) {
       },
       async pressSos() {
         const band = bandRef.current;
+        phoneSosRef.current = true;
+        window.setTimeout(() => {
+          phoneSosRef.current = false;
+        }, 4000);
+        bandAskRef.current = false;
+        setBandSosAsk(false);
         if (isSimulatorBand(band) && band.isConnected()) band.pressSos();
         ackRef.current = null;
         return refreshTriage(true);
+      },
+      bandSosAsk,
+      async confirmBandSos() {
+        bandAskRef.current = false;
+        setBandSosAsk(false);
+        ackRef.current = null;
+        return refreshTriage(true);
+      },
+      dismissBandSos() {
+        bandAskRef.current = false;
+        ignoreBandSosUntil.current = Date.now() + 5000;
+        setBandSosAsk(false);
       },
       markSmsOpened,
       async playDemo(step) {
