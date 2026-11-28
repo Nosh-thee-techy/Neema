@@ -10,6 +10,9 @@ import { RecordBirthPage } from '../pages/RecordBirthPage';
 import { RecoveryCheckPage } from '../pages/RecoveryCheckPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { InsightsPage } from '../pages/InsightsPage';
+import { StoryPage } from '../pages/StoryPage';
+import { ReadingCheckPage } from '../pages/ReadingCheckPage';
+import { CirclePage } from '../pages/CirclePage';
 import { WellbeingPage } from '../pages/WellbeingPage';
 import { UnlockPage } from '../pages/UnlockPage';
 import { HomePage } from '../pages/HomePage';
@@ -225,6 +228,30 @@ export function AppRouter() {
               element={
                 <RequireAuth>
                   <InsightsPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/story"
+              element={
+                <RequireAuth>
+                  <StoryPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/reading-check"
+              element={
+                <RequireAuth>
+                  <ReadingCheckPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/circle"
+              element={
+                <RequireAuth>
+                  <CirclePage />
                 </RequireAuth>
               }
             />

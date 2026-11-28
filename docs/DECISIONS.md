@@ -105,3 +105,52 @@ SpO2, motion, speech recognition, cloud DB, analytics, silent SMS, diagnosis wor
 - **Insights** (new tab) holds the full guides: pregnancy week by week (explorable), or after birth "Your recovery" and "Your baby" tabs. Navigation: Today, Insights, CareChat, History (+ Sleep & mood after birth).
 - **Settings** (avatar on Today): avatar, name and phone, **View profile** (personal details, pregnancy/birth, contacts, health notes, nurse notes, birth plan, clinic), **Your Neema experience** with only *Track pregnancy* and *Track after birth* (no cycle or perimenopause tracking), then app, security and privacy settings. Choosing *Track after birth* opens Record the birth; choosing *Track pregnancy* after birth asks for confirmation and removes the birth record (pregnancy data was never removed).
 - **No CHP / record-birth cards on Today.** The missing-CHP warning moved to Settings, and a red dot on the avatar shows until a real CHP number is saved. Safety alerts (RED, YELLOW, band problems) still appear on Today directly under the header.
+
+## Patient clarity pass
+
+Wording and small layout fixes so a mother is never left guessing. The Today layout, quick actions, week strip and insights cards from the previous round are unchanged.
+
+- **Blood pressure form starts empty.** It used to open with 120 and 80 already filled in, so one tap on Save recorded a normal reading she never took. Save stays off until both numbers are typed. Numbers that cannot be right (top smaller than bottom, outside 60–260 / 30–200) get a plain message instead of being saved. Labels are "Top number" and "Bottom number", with where to find each on the cuff.
+- **Emergency button says what it is.** "Emergency / Hold to call" (was "HOLD / 999 + CHP"). A quick tap now answers "Hold 2 seconds" instead of doing nothing. The hold, the 999 call and the alert to the CHP are unchanged.
+- **CareChat opens with the question the button promised.** "Start Daily Check-in" lands on "How are you feeling today?", with two cards (tell Neema by voice, what should I do now), four one-tap feelings, and labelled Speak and Sign language buttons. The triage level is a sentence ("Neema cannot see enough readings yet"), not the word UNKNOWN. RED shows a "Get help now" button to the alert steps. The dead "Today's list" menu item is gone.
+- **Symptoms: the list comes first**, the body picture is an option below it.
+- **Band page: connecting comes first.** "Connect your band" is the main button at the top. The simulator is "Try a practice band" and says its readings are examples, not hers.
+- **Your people** says in one sentence who gets her alerts and whether a CHP number is missing, and spells out CHP once. The page no longer runs off the right edge of the phone.
+- **Alert page does not promise an SMS before it exists.** The SMS buttons appear a few seconds after RED (the spoken message and the location check run first). Until then the page says the SMS is being prepared. The alert chain itself is unchanged.
+- **Settings is findable:** a small cog on the Today avatar.
+- **Swahili wording changed in this pass needs a Swahili speaker's review** before the field: the emergency button, BP form, CareChat, Symptoms labels ("Kichwa kinauma", "Kutoona vizuri", "Mtoto anasonga kidogo"), band page and Your people.
+- **Not done, for the team to decide:** the alert page shows a research ASL clip of an unrelated sentence, with its research label, to every mother in an emergency. Building the SMS before speaking would remove the wait on the alert page.
+
+## Interactive Neema
+
+Neema's portrait is now a drawing made in code (`apps/web/src/ui/NeemaAvatar.tsx`) instead of a photo file, so she can move. She replaces the picture on the landing page (hero and "Meet Neema"), the CareChat orb, the small faces beside her chat messages, and the sign-language screen.
+
+- **What she does:** blinks, breathes, looks toward the finger or pointer, moves her mouth while her answer is read aloud, leans in while the microphone is listening, and smiles and waves when tapped. In CareChat a tap also reads the screen aloud.
+- **Her face follows the safety level and never decides it.** She shows the level the triage engine already gave: smile for GREEN, attentive for YELLOW, serious for RED. UNKNOWN is not shown as the calm smile. When RED she nods instead of smiling and waving, and the spoken line points to the red button.
+- **Motion is optional.** With "reduce motion" switched on in the phone she stays still. Animation pauses when she is off screen.
+- **She is a placeholder drawing by the build team**, in the style of the earlier cartoon. A designer's artwork can replace the shapes without changing how she behaves. The old picture files in `public/brand/` and the unused `AvatarCompanion.tsx` are still in the repo.
+- **Swahili labels on her ("Gusa umsikie", "Gusa umsalimie") need a Swahili speaker's review.**
+
+## Three journeys, never labelled high-risk
+
+A mother is never called high-risk on screen. Neema keeps three quiet paths:
+
+- **Steady.** Nothing extra was known at the start, and nothing new is worrying. Before (the first 12 weeks), during the rest of pregnancy, and after birth.
+- **Watch.** Something has changed: a reading or a feeling. It is one moment to check, not a new name for the pregnancy.
+- **Known care.** She already had something to continue: a condition, a medicine, a past complication, or age under 18 or 35 and over. A new feeling is read next to that, and is not dismissed as "just the medicine".
+
+Daily insights on Today are wide landscape cards. The arrow opens full-page slides. The last slide is the only one that opens CareChat, and it carries the cards into the conversation. "See all" still opens the week-by-week guide.
+
+The model we have is her personal baseline (about three quiet days of heart rate). It can only ask for a closer look. It does not name an illness. Sleep is on the pregnancy home as well as after birth. A slower heart while she has said she is asleep is not treated as an emergency. The band cannot tell sleep from unconsciousness; if she cannot be woken, a person gets help.
+
+The band's first long-press asks, out loud, whether it was a mistake. A second long-press, or "I need help", sends for help. The on-screen Emergency hold is unchanged: one 2-second hold.
+
+If blood pressure is very low and the heart is fast, and she is not asleep, a full-page check asks how she feels before anyone is called. No answer in 90 seconds prepares an SMS to her CHP, not a 999 call.
+
+The chase list stays on the health-team screen. It is no longer linked from her home or her alert page.
+
+Mood after birth still uses what she reports and the EPDS. Neema does not tell her she has depression. A thought of harm asks for a person the same day.
+
+The mothers' circle uses a cartoon name and bird. Her real name is never written there. Notes she writes stay on this phone. The three opening notes are written by Neema so the room is not empty. They are not other mothers online. A shared circle across phones needs a server we do not have yet.
+
+Swahili added for these screens needs a Swahili speaker's review.
