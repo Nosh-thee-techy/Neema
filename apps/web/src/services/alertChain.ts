@@ -12,8 +12,6 @@ import { LocationError, requestAlertLocation } from './location';
 import { speakMessageKey } from './speech';
 import { ensureFollowUp } from './followUp';
 import { loadProfile } from './passport';
-import { watchPlanFor } from './watchPlan';
-import { isQuietWhenOut } from './quietMode';
 
 export interface AlertChainResult {
   alertId: string;
@@ -40,10 +38,7 @@ export async function runAlertChain(
 ): Promise<AlertChainResult | null> {
   if (result.level !== 'YELLOW' && result.level !== 'RED') return null;
 
-  // Quiet when out: a YELLOW is felt on the band and shown on screen, not spoken aloud.
-  // RED is always spoken.
-  const quiet = result.level === 'YELLOW' && isQuietWhenOut();
-  const spokenResult = quiet ? 'text-only' : await speakMessageKey(result.messageKey);
+  const spokenResult = await speakMessageKey(result.messageKey);
   let locationUrl: string | undefined;
   let locationAttached = false;
   if (result.level === 'RED') {
@@ -56,7 +51,6 @@ export async function runAlertChain(
   }
 
   const profile = await loadProfile().catch(() => null);
-  const watching = watchPlanFor(profile).items[0]?.reason.chpSw;
   // Never invent contacts: an SMS to a placeholder number reaches nobody.
   const contacts = (await contactReadiness()).usable;
   const { alert, body, smsLinks } = await raiseAlert(
@@ -66,8 +60,6 @@ export async function runAlertChain(
       motherName: profile?.displayName ?? 'Mama',
       reasons: result.reasons,
       ...(locationUrl ? { locationUrl } : {}),
-      // The CHP sees why Neema watches her closely (first item of her plan, Swahili).
-      ...(watching ? { watching } : {}),
     },
     contacts,
     options,

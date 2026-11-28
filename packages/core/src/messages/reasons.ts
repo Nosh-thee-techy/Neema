@@ -39,14 +39,6 @@ const REASONS: [code: string, phrase: ReasonPhrase][] = [
   ['bp_raised', { sw: 'shinikizo la damu limeinuka', en: 'raised blood pressure' }],
   ['fever', { sw: 'homa', en: 'fever' }],
   [
-    'pulse_rising',
-    { sw: 'mapigo ya moyo yanaendelea kupanda', en: 'pulse keeps climbing' },
-  ],
-  [
-    'pulse_fast_resting',
-    { sw: 'mapigo ya moyo ya haraka akiwa amepumzika', en: 'fast pulse at rest' },
-  ],
-  [
     'pulse_above_baseline',
     { sw: 'mapigo ya moyo juu ya kawaida yake', en: 'pulse above her normal' },
   ],
@@ -89,11 +81,6 @@ export interface AlertSmsDraft {
   reasons: readonly string[];
   /** Maps link from geolocation, when she allowed it. */
   locationUrl?: string;
-  /**
-   * Why Neema watches her more closely (her watch plan), in Swahili. Added to the YELLOW
-   * heads-up only: that SMS goes to the CHP alone, while RED also reaches family.
-   */
-  watching?: string;
 }
 
 /**
@@ -110,6 +97,5 @@ export function buildAlertSmsText(draft: AlertSmsDraft): string {
   if (draft.level === 'RED') {
     return `NEEMA: ${who} yuko RED. Sababu: ${reason}. Mahali: ${place}. Tafadhali mfikie sasa.`;
   }
-  const watching = draft.watching?.trim() ? ` Anaangaliwa kwa karibu: ${draft.watching.trim().replace(/\.$/, '')}.` : '';
-  return `NEEMA: ${who} yuko YELLOW. Sababu: ${reason}.${watching} Tunapima tena. Tafadhali mfuatilie leo.`;
+  return `NEEMA: ${who} yuko YELLOW. Sababu: ${reason}. Tunapima tena. Tafadhali mfuatilie leo.`;
 }

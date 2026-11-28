@@ -14,13 +14,7 @@
   },
   "pulse": {
     "postpartumFastBpm": 100,
-    "baselineZ": 2.0,
-    "restingFastBpm": null,
-    "slowRise": {
-      "enabled": false,
-      "bpmAboveReference": 20,
-      "sustainMinutes": 20
-    }
+    "baselineZ": 2.0
   },
   "shockIndex": {
     "referral": 0.9,

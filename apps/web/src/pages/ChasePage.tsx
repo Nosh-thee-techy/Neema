@@ -12,7 +12,6 @@ import { listChase, markArrival, tickFollowUps } from '../services/followUp';
 import { getReadiness } from '../services/readiness';
 import { db } from '../storage/db';
 import { useLocale } from '../hooks/useLocale';
-import { useWatchPlan } from '../hooks/useWatchPlan';
 
 interface ChaseRow extends FollowUp {
   level?: string;
@@ -27,7 +26,6 @@ export function ChasePage() {
   const [rows, setRows] = useState<ChaseRow[]>([]);
   const [note, setNote] = useState<string | null>(null);
   const [demoAdvance, setDemoAdvance] = useState(false);
-  const { plan } = useWatchPlan();
 
   const loadRows = useCallback(async () => {
     const open = await listChase();
@@ -81,16 +79,6 @@ export function ChasePage() {
           ? 'RED na YELLOW zilizofunguliwa. Mtu pekee ndiye anayefunga kwa kuwasili.'
           : 'Open RED and YELLOW loops. Only a person closes them by confirming arrival.'}
       </p>
-      {plan && plan.items.length > 0 ? (
-        <div className="watch-ask" role="note">
-          <h2 className="watch-ask__title">{lang === 'sw' ? 'Anaangaliwa kwa karibu' : 'Watched more closely'}</h2>
-          <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
-            {plan.items.map((i) => (
-              <li key={i.id}>{lang === 'sw' ? i.reason.chpSw : i.reason.en}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
 
       {note ? <p className="soft-note">{note}</p> : null}
 

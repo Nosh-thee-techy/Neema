@@ -6,7 +6,6 @@ import { parseLocalIsoDate, postpartumProgress, pregnancyProgress, type Postpart
 import { db, type BabyRow } from '../storage/db';
 import { loadProfile, saveProfile, type DeliveryRecord, type MamaProfile } from './passport';
 import { datingFromProfile } from './pregnancyProgress';
-import { restartSettledPulse } from './baselineStore';
 
 export function deliveryMsOf(p: MamaProfile | null | undefined): number | null {
   if (!p?.delivery?.dateIso) return null;
@@ -45,8 +44,6 @@ export async function recordDelivery(
   };
   const next: MamaProfile = { ...existing, stage: 'postpartum', delivery };
   await saveProfile(next);
-  // A new birth: learn her settled pulse afresh (correcting the details does not restart it).
-  if (!existing.delivery) await restartSettledPulse().catch(() => undefined);
 
   // Replace baby rows for this birth date (re-recording edits them).
   await db.babies.where('birthDateIso').equals(record.dateIso).delete();
@@ -71,7 +68,6 @@ export async function undoDelivery(): Promise<MamaProfile | null> {
   await db.babies.where('birthDateIso').equals(delivery.dateIso).delete();
   const next: MamaProfile = { ...rest, stage: 'pregnancy' };
   await saveProfile(next);
-  await restartSettledPulse().catch(() => undefined);
   return next;
 }
 

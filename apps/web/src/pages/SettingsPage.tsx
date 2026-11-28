@@ -9,7 +9,6 @@ import { IconChevron } from '../ui/icons';
 import { loadConsent, loadProfile, saveConsent, type MamaProfile } from '../services/passport';
 import { listContacts } from '../services/contacts';
 import { undoDelivery } from '../services/delivery';
-import { isQuietWhenOut, setQuietWhenOut } from '../services/quietMode';
 import { lockSession } from '../services/auth';
 import { db, type ConsentRow } from '../storage/db';
 
@@ -18,7 +17,6 @@ import { db, type ConsentRow } from '../storage/db';
  * and the app's own settings. Patient details live under View profile.
  */
 export function SettingsPage() {
-  const [quietOut, setQuietOut] = useState(isQuietWhenOut);
   const nav = useNavigate();
   const g = useGuardian();
   const { lang } = useLocale();
@@ -245,18 +243,6 @@ export function SettingsPage() {
             {shareError}
           </p>
         ) : null}
-        <label className="row-divided">
-          <input type="checkbox" checked={quietOut} onChange={(e) => { setQuietWhenOut(e.target.checked); setQuietOut(e.target.checked); }} />
-          <span>
-            {tx('Quiet alerts when I am out', 'Tahadhari za kimya nikiwa nje')}
-            <span className="prof-sub" style={{ display: 'block', margin: 0 }}>
-              {tx(
-                'When Neema asks you to check (yellow), your band buzzes and the phone shows it without speaking aloud. An emergency (red) is always loud.',
-                'Neema ikikuomba uangalie (njano), bendi yako inatetemeka na simu inaonyesha bila kuongea kwa sauti. Dharura (nyekundu) daima ni kwa sauti.',
-              )}
-            </span>
-          </span>
-        </label>
         <p className="prof-sub">
           {tx(
             'Readings stay on this phone. An alert SMS goes only to the people ticked. Voice and chat questions are sent online to be answered.',

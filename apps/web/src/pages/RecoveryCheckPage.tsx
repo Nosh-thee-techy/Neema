@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { isPlaceholderPhone, type Contact, type SymptomCode, type TriageResult } from '@neema/core';
 import { useLocale } from '../hooks/useLocale';
 import { useGuardian } from '../hooks/useGuardian';
-import { useWatchPlan } from '../hooks/useWatchPlan';
 import { loadProfile } from '../services/passport';
 import { recoveryProgressOf } from '../services/delivery';
 import { listContacts } from '../services/contacts';
@@ -67,13 +66,6 @@ interface Answers {
 }
 
 export function RecoveryCheckPage() {
-  // Her watch plan: the signs Neema asks her about most come first, with the reason.
-  const { plan: watchPlan } = useWatchPlan();
-  const watchAsk = watchPlan?.ask ?? [];
-  const dangersInOrder = useMemo(() => {
-    const mine = DANGERS.filter((d) => d.codes.some((c) => watchAsk.includes(c)));
-    return [...mine, ...DANGERS.filter((d) => !mine.includes(d))];
-  }, [watchAsk]);
   const nav = useNavigate();
   const g = useGuardian();
   const { lang } = useLocale();
@@ -237,14 +229,8 @@ export function RecoveryCheckPage() {
           <>
             <h1 className="screen-title">{tx('Have you had any of these today?', 'Umepata lolote kati ya haya leo?')}</h1>
             <p className="screen-sub">{tx('Tap all that apply. This keeps you safe.', 'Gusa yote yanayohusika. Hii inakulinda.')}</p>
-            {watchPlan && watchPlan.items.length > 0 ? (
-              <p className="watch-ask__why">
-                {tx('Neema asks you about the first ones especially. ', 'Neema inakuuliza hasa kuhusu ya kwanza. ')}
-                {watchPlan.items.map((i) => tx(i.reason.en, i.reason.sw)).join(' ')}
-              </p>
-            ) : null}
             <div className="chip-grid rcq-dangers">
-              {dangersInOrder.map((d) => (
+              {DANGERS.map((d) => (
                 <button
                   key={d.key}
                   type="button"

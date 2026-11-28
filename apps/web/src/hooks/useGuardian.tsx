@@ -28,7 +28,7 @@ import { createSimulatorBand, isSimulatorBand } from '../services/simulatorBand'
 import { createWebBluetoothBand } from '../services/webBluetoothBand';
 import { createVitalsPipeline } from '../services/vitalsPipeline';
 import { runTriage } from '../services/triageRunner';
-import { applyBandFeedback, nudgeIfCheckDue } from '../services/bandFeedback';
+import { applyBandFeedback } from '../services/bandFeedback';
 import type { BandSource } from '../services/bandSource';
 import {
   createRecheckLoop,
@@ -49,8 +49,6 @@ import { tickFollowUps } from '../services/followUp';
 import { contactReadiness } from '../services/contacts';
 import { startEscalation } from '../services/escalation';
 import { soundAlarm } from '../services/alarm';
-import { watchPlanFor } from '../services/watchPlan';
-import { progressFromProfile } from '../services/pregnancyProgress';
 import { loadProfile } from '../services/passport';
 import { resetDemoData, seedDemoStep, type DemoStep } from '../services/demoPlayer';
 import type { EscalationHandle } from '../services/escalation';
@@ -358,27 +356,17 @@ export function GuardianProvider({ children }: { children: ReactNode }) {
         const override = stageOverrideRef.current;
         const profile = override ? null : await loadProfile().catch(() => null);
         const activeStage: Stage = override?.stage ?? profile?.stage ?? 'pregnancy';
-        const weeks = override
-          ? override.gestationWeeks
-          : (progressFromProfile(profile)?.weeks ?? profile?.gestationWeeks);
+        const weeks = override ? override.gestationWeeks : profile?.gestationWeeks;
         setStage(activeStage);
-        // Her watch plan: stricter settings from her own history (none in demo or when locked).
-        const plan = watchPlanFor(override ? null : profile);
         const result = await runTriage({
           stage: activeStage,
           ...(activeStage === 'pregnancy' && weeks !== undefined ? { gestationWeeks: weeks } : {}),
           sosActive: sos,
           markedResting: true,
           timeZone: 'Africa/Nairobi',
-          config: plan.config,
         });
         setTriage(result);
         await handleLevelTransition(result);
-        // A check her plan asks for (e.g. blood pressure) is due: one gentle buzz a day.
-        if (plan.bpEveryDays !== null && result.level !== 'RED') {
-          const lastBp = await db.bp.orderBy('tsMs').last().catch(() => undefined);
-          await nudgeIfCheckDue(bandRef.current, plan, lastBp?.tsMs ?? null).catch(() => false);
-        }
         return result;
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
