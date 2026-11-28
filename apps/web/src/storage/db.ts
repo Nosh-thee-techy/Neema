@@ -36,7 +36,7 @@ export interface ConsentRow {
 }
 
 export interface BaselineRow {
-  id: string; // 'hr' | 'temp'
+  id: string; // 'hr' | 'temp' | 'hr_ref' (settled pulse, watch plan)
   mean: number;
   variance: number;
   samples: number;

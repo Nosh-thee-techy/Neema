@@ -787,7 +787,7 @@ export function RegisterPage() {
                         </button>
                       ))}
                     </div>
-                    {why('Past problems help the nurse plan care. They do not change alerts.', 'Matatizo ya zamani humsaidia muuguzi kupanga huduma. Hayabadilishi tahadhari.')}
+                    {why('Past problems help the nurse plan care, and let Neema watch more closely where it matters. They only ever make Neema more careful.', 'Matatizo ya zamani humsaidia muuguzi kupanga huduma, na humwezesha Neema kukuangalia kwa karibu zaidi inapohitajika. Yanamfanya Neema awe makini zaidi tu.')}
                   </>
                 )}
               </>

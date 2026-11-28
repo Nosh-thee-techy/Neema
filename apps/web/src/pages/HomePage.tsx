@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { RECOVERY_EMERGENCY_SIGNS, babyStageFor, getDefaultTriageConfig, insightForWeek, nextAncContact, nextPncContact, recoveryStageFor, type BpReading } from '@neema/core';
 import { useGuardian } from '../hooks/useGuardian';
 import { useLocale } from '../hooks/useLocale';
+import { useWatchPlan } from '../hooks/useWatchPlan';
+import { WatchingCard } from '../ui/WatchingCard';
 import { useToday } from '../hooks/useToday';
 import { useVitalsTrend } from '../hooks/useVitalsTrend';
 import { displayTemp } from '../ui/VitalsDashboard';
@@ -82,6 +84,7 @@ export function HomePage() {
   const tx = (en: string, swText: string) => (sw ? swText : en);
   const level = g.triage?.level ?? 'UNKNOWN';
   const today = useToday(`${level}:${g.recheck.status}`);
+  const watch = useWatchPlan(`${level}:${g.recheck.status}`);
   const trend = useVitalsTrend(`${level}:${g.demoStep ?? ''}`);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [openLoops, setOpenLoops] = useState(0);
@@ -444,6 +447,9 @@ export function HomePage() {
           </button>
         ))}
       </nav>
+
+      {/* Her watch plan: what Neema watches more closely for her, and why */}
+      <WatchingCard snap={watch} sw={sw} />
 
       {/* Daily insights */}
       <section className="today-insights" aria-labelledby="insights-title">

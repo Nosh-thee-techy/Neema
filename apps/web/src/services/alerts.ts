@@ -17,6 +17,8 @@ export interface AlertDraft {
   reasons: readonly string[];
   /** Optional maps link; ASSUMPTION: caller supplies after geolocation consent. */
   locationUrl?: string;
+  /** Why her watch plan watches her more closely (Swahili). YELLOW SMS only. */
+  watching?: string;
 }
 
 /** Builds a short alert body. Swahili wording still needs native review. */
@@ -26,6 +28,7 @@ export function buildAlertSmsBody(draft: AlertDraft): string {
     motherName: draft.motherName,
     reasons: draft.reasons,
     ...(draft.locationUrl ? { locationUrl: draft.locationUrl } : {}),
+    ...(draft.watching ? { watching: draft.watching } : {}),
   });
 }
 

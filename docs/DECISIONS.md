@@ -154,3 +154,19 @@ Mood after birth still uses what she reports and the EPDS. Neema does not tell h
 The mothers' circle uses a cartoon name and bird. Her real name is never written there. Notes she writes stay on this phone. The three opening notes are written by Neema so the room is not empty. They are not other mothers online. A shared circle across phones needs a server we do not have yet.
 
 Swahili added for these screens needs a Swahili speaker's review.
+
+## Watch plan: care that follows her own story
+
+Full plain-language note: `docs/WATCH_PLAN.md`.
+
+- **Her history now changes how closely Neema watches.** `buildWatchPlan` (core) reads past complications, conditions and the birth record and returns items with a reason, an end date, stricter limits, extra check-in questions and a blood pressure interval. With no history the plan is empty and triage is exactly as before.
+- **Stricter always wins.** `applyStricter` only lowers limits and only switches checks on. The general `triage.config.json` is never loosened.
+- **Two new pulse checks, off in the general settings:** R18 (pulse held at or above a limit at rest for 20 minutes) and R19 (pulse held well above her settled pulse). Both YELLOW, both reuse the reviewed `yellow_pulse_baseline` message. A gap in the band signal is not read as a pulse.
+- **Settled pulse (`hr_ref`).** The existing baseline (alpha 0.05 per minute) re-learns within the hour, so a slow climb over an afternoon never stood out. `hr_ref` averages over about a day and restarts when the birth is recorded or removed. Simulated: Wanjiku's climb from 86 to about 110 bpm stays GREEN with general settings and turns YELLOW at 14:30 with her plan.
+- **What she sees:** "What Neema is watching for you" on Today (reason, what Neema does, until when, blood pressure due), her questions first on Symptoms and the after-birth check-in. Never "high-risk".
+- **CHP:** the YELLOW SMS (CHP only) adds "Anaangaliwa kwa karibu: …". RED, which also reaches family, does not carry her history. The health-team list shows the reasons.
+- **Band:** yellow/red light and buzz already followed triage, so they now follow her plan. New: one gentle buzz a day (07:00–20:00) when a blood pressure check is due. New setting "Quiet alerts when I am out": YELLOW is not spoken aloud; RED always is.
+- **Registration copy corrected:** past problems "only ever make Neema more careful" (it used to say they do not change alerts).
+- **For clinicians to decide:** every number is a DRAFT placeholder (100 bpm, +15 bpm, 20 minutes, 37.8 °C, every 2 days, 6 weeks), and whether every mother after birth should get R18/R19 at gentler limits.
+- **Not built (proposal for the hardware team):** sending her limits to the band so it can warn her when the phone is away, a small on-band record, and a movement sensor. See step 5 in `docs/WATCH_PLAN.md`.
+- Insights arrow on Today enlarged from 36px to 44px (the journeys check for 40px tap targets had been failing).
