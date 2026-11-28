@@ -1,3 +1,14 @@
+declare module '../../notifyServer.mjs' {
+  export function noticesConfigured(): boolean;
+  export function placeNotices(input: { calls?: unknown; sms?: unknown }): Promise<{
+    configured: boolean;
+    callsPlaced: number;
+    smsSent: number;
+  }>;
+  export function handleVoice(phone: string): string;
+  export function phoneFromCallback(query: Record<string, string>, raw: string): string;
+}
+
 declare module '../../signPlanServer.mjs' {
   export const FALLBACK_ORDER: string[];
   export function filterAllowlisted(ids: unknown): string[];

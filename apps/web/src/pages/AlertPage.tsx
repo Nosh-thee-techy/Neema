@@ -1,4 +1,4 @@
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useGuardian } from '../hooks/useGuardian';
 import { useLocale } from '../hooks/useLocale';
@@ -11,6 +11,7 @@ import { ErrorScreen } from '../ui/ErrorScreen';
 import { getMessageTextFor, speakMessageKey } from '../services/speech';
 import { buildSmsLink } from '../services/alerts';
 import { EMERGENCY_NUMBER, EMERGENCY_TEL } from '../services/emergency';
+import { phoneFromSmsHref, placeSosNotice } from '../services/sosNotice';
 import { reasonPhrase, topReason } from '@neema/core';
 
 type AckKind = 'chp_replied' | 'mother_on_the_way';
@@ -33,12 +34,33 @@ export function AlertPage() {
   const [openedFlash, setOpenedFlash] = useState<string | null>(null);
   const [ackBusy, setAckBusy] = useState<AckKind | null>(null);
   const [smsPressed, setSmsPressed] = useState(false);
+  const [placed, setPlaced] = useState<{ calls: number; sms: number } | null>(null);
+  const noticeOnce = useRef(false);
   const [, startTransition] = useTransition();
 
   useEffect(() => {
     const id = window.requestAnimationFrame(() => setMounted(true));
     return () => window.cancelAnimationFrame(id);
   }, []);
+
+  useEffect(() => {
+    if (!isRed || !g.alertBody || sms.length === 0 || noticeOnce.current) return;
+    const targets = sms.flatMap((item) => {
+      const to = phoneFromSmsHref(item.href);
+      return to ? [to] : [];
+    });
+    if (targets.length === 0) return;
+    noticeOnce.current = true;
+    const message = g.alertBody;
+    void placeSosNotice({
+      calls: targets.map((to) => ({ to, message })),
+      sms: targets.map((to) => ({ to, message })),
+    }).then((result) => {
+      if (result.callsPlaced > 0 || result.smsSent > 0) {
+        setPlaced({ calls: result.callsPlaced, sms: result.smsSent });
+      }
+    });
+  }, [isRed, g.alertBody, sms]);
 
   const anySmsOpened = sms.some((item) => item.opened);
   const activeStep = g.redAcknowledged ? 3 : anySmsOpened || smsPressed ? 2 : 1;
@@ -69,17 +91,26 @@ export function AlertPage() {
       </a>
       {fromSos ? (
         <p className="soft-note call-999__note">
+          {placed && placed.calls > 0
+            ? lang === 'sw'
+              ? 'Neema anampigia mtu wako wa afya. '
+              : 'Neema is calling your health person. '
+            : ''}
           {lang === 'sw'
             ? `Simu yako inafungua ${EMERGENCY_NUMBER}. Bonyeza kitufe cha kijani kupiga.`
             : `Your phone is opening ${EMERGENCY_NUMBER}. Press the green call button.`}{' '}
-          {/* Only promise the SMS once its button is really on the page. */}
-          {sms.length > 0
+          {/* Only promise a sent text when the gateway accepted it. Otherwise the button is still hers to send. */}
+          {placed && placed.sms > 0
             ? lang === 'sw'
-              ? 'SMS kwa CHP zimeandaliwa hapa chini.'
-              : 'SMS to your CHP is ready below.'
-            : lang === 'sw'
-              ? 'Neema inaandaa SMS kwa CHP wako.'
-              : 'Neema is getting the SMS for your CHP ready.'}
+              ? 'Ujumbe umetumwa pia. Unaweza kuutuma tena hapa chini.'
+              : 'A text was sent as well. You can send it again below.'
+            : sms.length > 0
+              ? lang === 'sw'
+                ? 'SMS kwa CHP zimeandaliwa hapa chini.'
+                : 'SMS to your CHP is ready below.'
+              : lang === 'sw'
+                ? 'Neema inaandaa SMS kwa CHP wako.'
+                : 'Neema is getting the SMS for your CHP ready.'}
         </p>
       ) : null}
     </div>
@@ -216,8 +247,12 @@ export function AlertPage() {
             <strong>{lang === 'sw' ? 'Fungua ujumbe' : 'Open the message'}</strong>
             <p className="soft-note">
               {lang === 'sw'
-                ? 'Neema imeandaa SMS fupi kwa CHP yako — fungua na utume.'
-                : 'Neema prepared a short SMS for your CHP — open it and send.'}
+                ? placed && placed.sms > 0
+                  ? 'Ujumbe umetumwa. Fungua hapa chini ikiwa unataka kuutuma tena.'
+                  : 'Neema imeandaa SMS fupi kwa CHP yako — fungua na utume.'
+                : placed && placed.sms > 0
+                  ? 'The text was sent. Open it below if you want to send it again.'
+                  : 'Neema prepared a short SMS for your CHP — open it and send.'}
             </p>
           </div>
         </li>
