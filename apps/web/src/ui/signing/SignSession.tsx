@@ -8,6 +8,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToday } from '../../hooks/useToday';
 import { IconDots, IconFeel, IconMic, IconPlus, IconRefresh, IconSpark } from '../icons';
+import { NeemaAvatar } from '../NeemaAvatar';
 import { ASL_PLAYBACK_RATE, AslPlayer, type SignedLine } from './AslPlayer';
 import { ASL_CITATION, ASL_LABEL } from './aslLibrary';
 import {
@@ -196,20 +197,16 @@ export function SignSession({
                 onProblem={showProblem}
               />
             ) : (
-              <img
-                className="sign-session__orb-face"
-                src="/brand/neema-companion.jpg"
-                alt=""
-                width={240}
-                height={240}
-                decoding="async"
-              />
+              <NeemaAvatar live label={lang === 'sw' ? 'Neema. Gusa umsalimie' : 'Neema. Tap to say hello'} />
             )}
           </div>
-          <span className="sign-session__orb-eyes" aria-hidden>
-            <i />
-            <i />
-          </span>
+          {/* Neema has her own eyes; the glowing eyes are only for the signing figure. */}
+          {started ? (
+            <span className="sign-session__orb-eyes" aria-hidden>
+              <i />
+              <i />
+            </span>
+          ) : null}
         </div>
 
         {started ? (

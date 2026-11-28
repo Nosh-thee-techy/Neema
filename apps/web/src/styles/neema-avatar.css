@@ -1,0 +1,285 @@
+/* Neema, the illustrated companion (ui/NeemaAvatar.tsx).
+   She fills her parent; the parent gives the size and the rounded shape. */
+
+.neema {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  font: inherit;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button.neema {
+  appearance: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.neema__art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transition: transform 140ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+button.neema:active .neema__art {
+  transform: scale(0.97);
+}
+
+.neema svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Focus ring drawn inside, because her frame clips anything outside it. */
+button.neema:focus-visible {
+  outline: none;
+}
+
+button.neema:focus-visible::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 3px #1d2740,
+    inset 0 0 0 5px #fffdfa;
+  pointer-events: none;
+}
+
+/* ---------- Parts that move ---------- */
+
+.neema__tilt,
+.neema__track {
+  transform-box: view-box;
+  transform-origin: 100px 138px;
+}
+
+.neema__tilt {
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.neema__track {
+  transition: transform 220ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.neema__pupil {
+  transition: transform 180ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.neema__body {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+.neema__eye,
+.neema__jaw,
+.neema__brow {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.neema__brow {
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.neema__hand {
+  transform-box: fill-box;
+  transform-origin: 50% 80%;
+  opacity: 0;
+  transform: translateY(44px);
+}
+
+/* ---------- Expressions ---------- */
+
+.neema__mouth,
+.neema__eyes {
+  transition: opacity 140ms ease;
+}
+
+.neema__mouth,
+.neema__eyes--happy {
+  opacity: 0;
+}
+
+.neema[data-mouth='smile'] .neema__mouth--smile,
+.neema[data-mouth='soft'] .neema__mouth--soft,
+.neema[data-mouth='concerned'] .neema__mouth--concerned,
+.neema[data-mouth='talk'] .neema__mouth--talk,
+.neema[data-mouth='big'] .neema__mouth--big {
+  opacity: 1;
+}
+
+.neema[data-react='happy'] .neema__eyes--open {
+  opacity: 0;
+}
+
+.neema[data-react='happy'] .neema__eyes--happy {
+  opacity: 1;
+}
+
+/* Attentive: brows lift a little. */
+.neema[data-mood='watchful'] .neema__brow,
+.neema[data-listening='true'] .neema__brow {
+  transform: translateY(-1.8px);
+}
+
+/* Concerned: inner ends of the brows lift. */
+.neema[data-mood='urgent'] .neema__brow--left {
+  transform: translateY(-1px) rotate(-9deg);
+}
+
+.neema[data-mood='urgent'] .neema__brow--right {
+  transform: translateY(-1px) rotate(9deg);
+}
+
+/* Listening: she leans her head toward the mother. */
+.neema[data-listening='true'] .neema__tilt {
+  transform: rotate(-4deg);
+}
+
+/* ---------- Life: only when live, paused off screen ---------- */
+
+.neema[data-live='true'] .neema__body {
+  animation: neema-breathe 5.2s ease-in-out infinite;
+}
+
+.neema[data-live='true'] .neema__eye {
+  animation: neema-blink 6.4s linear infinite;
+}
+
+.neema[data-mouth='talk'] .neema__jaw {
+  animation: neema-talk 1.15s ease-in-out infinite;
+}
+
+.neema[data-react='happy'] .neema__tilt,
+.neema[data-react='nod'] .neema__tilt {
+  animation: neema-nod 760ms cubic-bezier(0.645, 0.045, 0.355, 1) 1;
+}
+
+.neema[data-react='happy'] .neema__hand {
+  animation: neema-wave 1.5s cubic-bezier(0.645, 0.045, 0.355, 1) 1;
+}
+
+.neema[data-offscreen='true'] * {
+  animation-play-state: paused !important;
+}
+
+@keyframes neema-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.012, 1.022);
+  }
+}
+
+/* One blink, then a quick double blink later, so it never looks like a metronome. */
+@keyframes neema-blink {
+  0%,
+  37%,
+  41%,
+  77%,
+  81%,
+  85%,
+  100% {
+    transform: scaleY(1);
+  }
+  39%,
+  79%,
+  83% {
+    transform: scaleY(0.08);
+  }
+}
+
+@keyframes neema-talk {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  18% {
+    transform: scaleY(1);
+  }
+  36% {
+    transform: scaleY(0.5);
+  }
+  54% {
+    transform: scaleY(0.95);
+  }
+  72% {
+    transform: scaleY(0.25);
+  }
+  86% {
+    transform: scaleY(0.75);
+  }
+}
+
+@keyframes neema-nod {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(3px);
+  }
+  55% {
+    transform: translateY(0);
+  }
+  78% {
+    transform: translateY(2px);
+  }
+}
+
+@keyframes neema-wave {
+  0% {
+    opacity: 0;
+    transform: translateY(44px) rotate(0deg);
+  }
+  16% {
+    opacity: 1;
+    transform: translateY(0) rotate(-12deg);
+  }
+  32% {
+    opacity: 1;
+    transform: translateY(0) rotate(14deg);
+  }
+  48% {
+    opacity: 1;
+    transform: translateY(0) rotate(-12deg);
+  }
+  64% {
+    opacity: 1;
+    transform: translateY(0) rotate(14deg);
+  }
+  80% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(44px) rotate(0deg);
+  }
+}
+
+/* Reduced motion: her expression still changes, nothing travels or loops. */
+@media (prefers-reduced-motion: reduce) {
+  .neema *,
+  .neema__art {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .neema[data-mouth='talk'] .neema__jaw {
+    transform: scaleY(0.7);
+  }
+}

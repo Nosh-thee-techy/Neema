@@ -4,7 +4,8 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { avatarState } from '@neema/core';
 import { useGuardian } from '../hooks/useGuardian';
 import { useLocale } from '../hooks/useLocale';
 import { useSpeechDictation } from '../hooks/useSpeechDictation';
@@ -13,20 +14,17 @@ import { askCareGuide } from '../services/careChat';
 import { speakText } from '../services/speech';
 import { Button } from '../ui/Button';
 import { LangToggle } from '../ui/LangToggle';
+import { NeemaAvatar } from '../ui/NeemaAvatar';
 import {
   IconCopy,
   IconDots,
   IconFeel,
   IconMic,
-  IconPlus,
   IconRefresh,
   IconSend,
-  IconSpark,
   IconSpeaker,
   IconThumb,
 } from '../ui/icons';
-
-type Mode = 'text' | 'voice' | 'sign';
 
 type Turn = {
   id: string;
@@ -39,16 +37,22 @@ type Turn = {
   sourceQuery?: string;
 };
 
-const PROMPTS = {
-  en: [
-    'What should I do?',
-    'I feel dizzy',
-    'My head hurts',
-    'Baby is moving less',
-    'I am stressed',
-  ],
-  sw: ['Nifanye nini?', 'Naona kizunguzungu', 'Kichwa kinauma', 'Mtoto anasonga kidogo', 'Nina msongo'],
+/** One-tap ways to say how she feels, so the check-in never starts from a blank box. */
+const FEELINGS = {
+  en: ['I feel dizzy', 'My head hurts', 'Baby is moving less', 'I am stressed'],
+  sw: ['Naona kizunguzungu', 'Kichwa kinauma', 'Mtoto anasonga kidogo', 'Nina msongo'],
 };
+
+/**
+ * The safety level in words a mother can act on. UNKNOWN is never worded as "fine":
+ * it says Neema cannot see enough yet.
+ */
+const STATUS_TEXT = {
+  GREEN: { en: 'No warning signs in your readings right now', sw: 'Hakuna dalili za hatari kwenye vipimo vyako sasa' },
+  YELLOW: { en: 'Something needs checking today', sw: 'Kuna jambo la kuangalia leo' },
+  RED: { en: 'Get help now', sw: 'Tafuta msaada sasa' },
+  UNKNOWN: { en: 'Neema cannot see enough readings yet', sw: 'Neema hajapata vipimo vya kutosha bado' },
+} as const;
 
 function turnSpeech(turn: Turn): string {
   return turn.title ? `${turn.title}. ${turn.text}` : turn.text;
@@ -57,6 +61,7 @@ function turnSpeech(turn: Turn): string {
 /** Conversational WHO-guided coach with tutor home + conversation shell. */
 export function CareChatPage() {
   const nav = useNavigate();
+  const loc = useLocation();
   const g = useGuardian();
   const { lang } = useLocale();
   const sw = lang === 'sw';
@@ -66,7 +71,6 @@ export function CareChatPage() {
   const today = useToday(`${level}`);
   const name = today.name ?? 'Mama';
 
-  const [mode, setMode] = useState<Mode>('voice');
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [speaking, setSpeaking] = useState(false);
@@ -74,8 +78,25 @@ export function CareChatPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [likedIds, setLikedIds] = useState<Record<string, boolean>>({});
   const [turns, setTurns] = useState<Turn[]>([]);
+
+  // Slides hand their words in so a question about "today" still has the cards.
+  const insightSeed = (loc.state as { insight?: string } | null)?.insight;
+  useEffect(() => {
+    if (!insightSeed) return;
+    setTurns([
+      {
+        id: 'insight-seed',
+        role: 'neema',
+        title: sw ? 'Kutoka kadi za leo' : 'From today’s cards',
+        text: insightSeed,
+      },
+    ]);
+  }, [insightSeed, sw]);
   const endRef = useRef<HTMLDivElement>(null);
   const chatting = turns.length > 0;
+  // Her face follows the safety level. UNKNOWN is not shown as the calm smile.
+  const mood = level === 'UNKNOWN' ? 'waiting' : avatarState(level, g.redAcknowledged);
+  const lastNeemaId = turns.findLast((turn) => turn.role === 'neema')?.id;
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -110,12 +131,10 @@ export function CareChatPage() {
         return [...t, reply];
       });
 
-      if (mode === 'voice' || mode === 'text') {
-        setSpeaking(true);
-        void speakText(turnSpeech(reply), { lang: lang === 'sw' ? 'sw-KE' : 'en-KE' }).finally(() => {
-          window.setTimeout(() => setSpeaking(false), 1200);
-        });
-      }
+      setSpeaking(true);
+      void speakText(turnSpeech(reply), { lang: lang === 'sw' ? 'sw-KE' : 'en-KE' }).finally(() => {
+        window.setTimeout(() => setSpeaking(false), 1200);
+      });
     } finally {
       setBusy(false);
     }
@@ -126,15 +145,25 @@ export function CareChatPage() {
       voice.stop();
       return;
     }
-    setMode('voice');
     const heard = await voice.listen({ mode: 'text' });
     if (heard) await ask(heard);
   }
 
-  function insertPrompt() {
-    const next = PROMPTS[lang][0];
-    setDraft(next);
-    setMode('text');
+  /** Tapping Neema reads the screen out loud, for a mother who would rather listen than read. */
+  function hearNeema() {
+    if (voice.listening) return;
+    const line =
+      level === 'RED'
+        ? sw
+          ? `${STATUS_TEXT.RED.sw}. Gusa kitufe chekundu kuona hatua.`
+          : `${STATUS_TEXT.RED.en}. Tap the red button to see the steps.`
+        : sw
+          ? `Habari, ${name}. Unajisikiaje leo? ${STATUS_TEXT[level].sw}.`
+          : `Hello, ${name}. How are you feeling today? ${STATUS_TEXT[level].en}.`;
+    setSpeaking(true);
+    void speakText(line, { lang: sw ? 'sw-KE' : 'en-KE' }).finally(() => {
+      window.setTimeout(() => setSpeaking(false), 600);
+    });
   }
 
   function goBack() {
@@ -205,20 +234,10 @@ export function CareChatPage() {
                 role="menuitem"
                 onClick={() => {
                   setMenuOpen(false);
-                  nav('/todo');
-                }}
-              >
-                {sw ? 'Orodha ya leo' : 'Today’s list'}
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false);
                   nav('/home');
                 }}
               >
-                {sw ? 'Nyumbani' : 'Home'}
+                {sw ? 'Rudi Leo' : 'Back to Today'}
               </button>
             </div>
           ) : null}
@@ -228,65 +247,61 @@ export function CareChatPage() {
       {!chatting ? (
         <section className="care-chat__home">
           <div className="care-chat__orb" data-speaking={speaking || voice.listening}>
-            <img
-              src="/brand/neema-companion.jpg"
-              alt=""
-              width={220}
-              height={220}
-              decoding="async"
-              className="care-chat__orb-img"
+            <NeemaAvatar
+              live
+              framing="close"
+              mood={mood}
+              speaking={speaking}
+              listening={voice.listening}
+              label={sw ? 'Neema. Gusa umsikie' : 'Neema. Tap to hear her'}
+              onPress={hearNeema}
             />
           </div>
 
           <p className="care-chat__hello">
             {sw ? 'Habari,' : 'Hello,'} {name}
           </p>
-          <h2 className="care-chat__help">{sw ? 'Naweza kukusaidiaje?' : 'How can I help you?'}</h2>
+          {/* The daily check-in lands here, so the screen opens with the check-in question. */}
+          <h2 className="care-chat__help">{sw ? 'Unajisikiaje leo?' : 'How are you feeling today?'}</h2>
+          {level === 'RED' ? (
+            <button type="button" className="care-chat__state-alert" onClick={() => nav('/alert')}>
+              {STATUS_TEXT.RED[lang]} · {sw ? 'ona hatua' : 'see the steps'}
+            </button>
+          ) : (
+            <p className="care-chat__state" data-level={level}>
+              {STATUS_TEXT[level][lang]}
+            </p>
+          )}
 
           <div className="care-chat__cards">
-            <button
-              type="button"
-              className="care-chat__card"
-              onClick={() => {
-                setMode('voice');
-                void listenAsk();
-              }}
-            >
-              <span className="care-chat__card-ico" data-tone="voice">
-                <IconMic />
-              </span>
-              <span className="care-chat__card-arrow" aria-hidden>
-                ↗
-              </span>
-              <strong>{sw ? 'Ongea kwa sauti' : 'Practice speaking'}</strong>
-              <span>
-                {sw
-                  ? 'Sema jinsi unavyohisi — Neema anajibu kwa sauti.'
-                  : 'Say how you feel — Neema answers out loud.'}
-              </span>
-            </button>
+            {voice.supported ? (
+              <button type="button" className="care-chat__card" onClick={() => void listenAsk()}>
+                <span className="care-chat__card-ico" data-tone="voice">
+                  <IconMic />
+                </span>
+                <strong>{sw ? 'Mwambie Neema kwa sauti' : 'Tell Neema by voice'}</strong>
+                <span>{sw ? 'Sema unavyojisikia. Neema atajibu kwa sauti.' : 'Say how you feel. Neema answers out loud.'}</span>
+              </button>
+            ) : null}
 
-            <button
-              type="button"
-              className="care-chat__card"
-              onClick={() => {
-                setMode('text');
-                void ask(sw ? 'Nifanye nini?' : 'What should I do?');
-              }}
-            >
+            <button type="button" className="care-chat__card" onClick={() => void ask(sw ? 'Nifanye nini?' : 'What should I do?')}>
               <span className="care-chat__card-ico" data-tone="guide">
                 <IconFeel />
               </span>
-              <span className="care-chat__card-arrow" aria-hidden>
-                ↗
-              </span>
-              <strong>{sw ? 'Nifanye nini?' : 'What should I do?'}</strong>
-              <span>
-                {sw
-                  ? 'Hatua moja kutoka kadi za WHO + hali yako.'
-                  : 'One clear step from WHO cards + your state.'}
-              </span>
+              <strong>{sw ? 'Nifanye nini sasa?' : 'What should I do now?'}</strong>
+              <span>{sw ? 'Hatua moja wazi, kulingana na vipimo vyako.' : 'One clear next step, based on your readings.'}</span>
             </button>
+          </div>
+
+          <div className="care-chat__feel">
+            <p id="feel-label">{sw ? 'Au gusa unachohisi' : 'Or tap what you feel'}</p>
+            <div className="care-chat__chips" role="group" aria-labelledby="feel-label">
+              {FEELINGS[lang].map((f) => (
+                <button key={f} type="button" className="care-chat__chip" disabled={busy} onClick={() => void ask(f)}>
+                  {f}
+                </button>
+              ))}
+            </div>
           </div>
         </section>
       ) : (
@@ -294,14 +309,9 @@ export function CareChatPage() {
           {turns.map((turn) =>
             turn.role === 'neema' ? (
               <article key={turn.id} className="care-msg" data-role="neema">
-                <img
-                  className="care-msg__face"
-                  src="/brand/neema-companion.jpg"
-                  alt=""
-                  width={40}
-                  height={40}
-                  decoding="async"
-                />
+                <span className="care-msg__face">
+                  <NeemaAvatar framing="face" mood={mood} speaking={speaking && turn.id === lastNeemaId} />
+                </span>
                 <div className="care-msg__stack">
                   <div className="care-msg__bubble" data-handoff={turn.handoff}>
                     {turn.title ? <strong>{turn.title}</strong> : null}
@@ -364,7 +374,9 @@ export function CareChatPage() {
           )}
           {busy ? (
             <div className="care-msg care-msg--typing" aria-hidden>
-              <img className="care-msg__face" src="/brand/neema-companion.jpg" alt="" width={40} height={40} />
+              <span className="care-msg__face">
+                <NeemaAvatar framing="face" mood={mood} />
+              </span>
               <div className="care-msg__bubble care-msg__bubble--typing">
                 <span />
                 <span />
@@ -377,89 +389,39 @@ export function CareChatPage() {
       )}
 
       <div className="care-chat__dock">
-        <div className="care-chat__status">
-          <p>
-            <strong>{level}</strong>{' '}
-            {sw ? '· majibu kutoka kadi za WHO' : '· answers from WHO care cards'}
-          </p>
-          <button type="button" className="care-chat__status-link" onClick={() => nav('/sign')}>
-            {sw ? 'Ishara' : 'Sign'}
-          </button>
-        </div>
-
-        {mode === 'sign' ? (
-          <div className="care-chat__composer care-chat__composer--sign">
-            <p className="soft-note">
-              {sw
-                ? 'Ishara hutumia mazungumzo yaliyoruhusiwa. Fungua kikao au rudia sauti/maandishi.'
-                : 'Sign uses allowlisted clips. Open the session, or switch back to voice/text.'}
-            </p>
-            <div className="care-chat__sign-row">
-              <Button variant="primary" onClick={() => nav('/sign')}>
-                {sw ? 'Fungua ishara' : 'Open sign'}
-              </Button>
-              <Button variant="secondary" onClick={() => setMode('voice')}>
-                {sw ? 'Sauti' : 'Voice'}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <form
-            className="care-chat__composer"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void ask(draft);
-            }}
-          >
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder={sw ? 'Uliza chochote kuhusu afya yako…' : 'Ask anything about your care…'}
-              aria-label={sw ? 'Ujumbe wako' : 'Your message'}
-              disabled={busy}
-              rows={2}
-            />
-            <div className="care-chat__composer-bar">
-              <div className="care-chat__tools">
-                <button
-                  type="button"
-                  className="care-chat__tool"
-                  aria-label={sw ? 'Pendekezo' : 'Suggestion'}
-                  onClick={insertPrompt}
-                >
-                  <IconSpark />
+        <form
+          className="care-chat__composer"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void ask(draft);
+          }}
+        >
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={sw ? 'Andika unavyojisikia, au uliza swali…' : 'Type how you feel, or ask a question…'}
+            aria-label={sw ? 'Ujumbe wako' : 'Your message'}
+            disabled={busy}
+            rows={2}
+          />
+          <div className="care-chat__composer-bar">
+            {/* The other ways to talk sit with the text box, each with its word. */}
+            <div className="care-chat__ways">
+              {voice.supported ? (
+                <button type="button" className="care-chat__way" aria-pressed={voice.listening} onClick={() => void listenAsk()}>
+                  <IconMic />
+                  {voice.listening ? (sw ? 'Gusa kusimamisha' : 'Tap to stop') : sw ? 'Sema' : 'Speak'}
                 </button>
-                <button
-                  type="button"
-                  className="care-chat__tool"
-                  aria-label={sw ? 'Ishara' : 'Sign'}
-                  onClick={() => setMode('sign')}
-                >
-                  <IconPlus />
-                </button>
-                {voice.supported ? (
-                  <button
-                    type="button"
-                    className="care-chat__tool"
-                    aria-pressed={voice.listening}
-                    aria-label={sw ? 'Sema' : 'Speak'}
-                    onClick={() => void listenAsk()}
-                  >
-                    <IconMic />
-                  </button>
-                ) : null}
-              </div>
-              <button
-                type="submit"
-                className="care-chat__send"
-                disabled={busy || !draft.trim()}
-                aria-label={sw ? 'Tuma' : 'Send'}
-              >
-                <IconSend />
+              ) : null}
+              <button type="button" className="care-chat__way" onClick={() => nav('/sign')}>
+                {sw ? 'Lugha ya ishara' : 'Sign language'}
               </button>
             </div>
-          </form>
-        )}
+            <button type="submit" className="care-chat__send" disabled={busy || !draft.trim()} aria-label={sw ? 'Tuma' : 'Send'}>
+              <IconSend />
+            </button>
+          </div>
+        </form>
 
         {voice.error ? (
           <p className="field-error" role="alert">

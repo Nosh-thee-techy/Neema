@@ -280,15 +280,11 @@
   animation: lp-float 7s ease-in-out infinite;
 }
 
-.lp-neema-hero img {
+/* Portrait frame for the illustrated Neema; she breathes and blinks on her own. */
+.lp-neema-frame {
   display: block;
   width: 100%;
-  height: auto;
   aspect-ratio: 3 / 4;
-  object-fit: cover;
-  object-position: center top;
-  animation: lp-neema-breathe 5.5s ease-in-out infinite;
-  transform-origin: center 30%;
 }
 
 .lp-neema-hero figcaption {
@@ -297,6 +293,8 @@
   right: 0;
   bottom: 0;
   padding: 2.4rem 1.15rem 1rem;
+  /* The name sits over her picture; taps go through to Neema. */
+  pointer-events: none;
   background: linear-gradient(180deg, transparent, rgba(22, 28, 42, 0.72));
   color: #f7f2e8;
   font-family: var(--lp-display);
@@ -341,32 +339,6 @@
   animation: lp-float 8s ease-in-out infinite;
 }
 
-.lp-meet__portrait::after {
-  content: '';
-  position: absolute;
-  top: 58%;
-  left: 50%;
-  width: 12%;
-  height: 3.2%;
-  border-radius: 50%;
-  background: rgba(92, 52, 36, 0.28);
-  transform: translateX(-50%) scaleY(0.35);
-  animation: lp-neema-mouth 3.2s ease-in-out infinite;
-  pointer-events: none;
-  mix-blend-mode: multiply;
-}
-
-.lp-meet__portrait img {
-  display: block;
-  width: 100%;
-  height: auto;
-  aspect-ratio: 3 / 4;
-  object-fit: cover;
-  object-position: center top;
-  animation: lp-neema-breathe 5.8s ease-in-out infinite;
-  transform-origin: center 28%;
-}
-
 .lp-meet__copy .lp-h2 {
   margin-top: 0;
 }
@@ -385,36 +357,9 @@
   }
 }
 
-@keyframes lp-neema-breathe {
-  0%,
-  100% {
-    transform: scale(1.01) translateY(0);
-  }
-  50% {
-    transform: scale(1.04) translateY(-1.2%);
-  }
-}
-
-@keyframes lp-neema-mouth {
-  0%,
-  70%,
-  100% {
-    opacity: 0;
-    transform: translateX(-50%) scaleY(0.25) scaleX(0.85);
-  }
-  78%,
-  86% {
-    opacity: 0.55;
-    transform: translateX(-50%) scaleY(1) scaleX(1);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .lp-neema-hero,
-  .lp-neema-hero img,
   .lp-meet__portrait,
-  .lp-meet__portrait img,
-  .lp-meet__portrait::after,
   .lp-band {
     animation: none !important;
   }

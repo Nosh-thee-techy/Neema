@@ -6,6 +6,7 @@ import { BrandMark } from '../ui/BrandMark';
 import { LangToggle } from '../ui/LangToggle';
 import { IconHeart, IconPressure, IconTemp, IconFeel, IconBell } from '../ui/icons';
 import { BandArt } from '../ui/BandArt';
+import { NeemaAvatar } from '../ui/NeemaAvatar';
 import '../styles/landing.css';
 
 type Copy = Record<Lang, string>;
@@ -172,13 +173,12 @@ export function LandingPage() {
             <div className="lp-hero__art">
               <Ribbon />
               <figure className="lp-neema-hero">
-                <img
-                  src="/brand/neema-companion.jpg"
-                  alt={lang === 'sw' ? 'Neema, mlinzi wa mama' : 'Neema, maternal guardian'}
-                  width={480}
-                  height={640}
-                  decoding="async"
-                />
+                <div className="lp-neema-frame">
+                  <NeemaAvatar
+                    live
+                    label={lang === 'sw' ? 'Neema, mlinzi wa mama. Gusa umsalimie' : 'Neema, maternal guardian. Tap to say hello'}
+                  />
+                </div>
                 <figcaption>Neema</figcaption>
               </figure>
               <BandArt className="lp-band lp-band--overlay" />
@@ -190,13 +190,9 @@ export function LandingPage() {
         <section className="lp-meet" id="neema" aria-labelledby="meet-neema-title">
           <div className="lp-wrap lp-meet__grid">
             <div className="lp-meet__portrait">
-              <img
-                src="/brand/neema-companion.jpg"
-                alt=""
-                width={420}
-                height={560}
-                decoding="async"
-              />
+              <div className="lp-neema-frame">
+                <NeemaAvatar live />
+              </div>
             </div>
             <div className="lp-meet__copy">
               <h2 className="lp-h2" id="meet-neema-title">
