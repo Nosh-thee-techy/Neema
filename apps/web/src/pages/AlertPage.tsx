@@ -70,8 +70,16 @@ export function AlertPage() {
       {fromSos ? (
         <p className="soft-note call-999__note">
           {lang === 'sw'
-            ? `Simu yako inafungua ${EMERGENCY_NUMBER}. Bonyeza kitufe cha kijani kupiga. SMS kwa CHP zimeandaliwa hapa chini.`
-            : `Your phone is opening ${EMERGENCY_NUMBER}. Press the green call button. SMS to your CHP is ready below.`}
+            ? `Simu yako inafungua ${EMERGENCY_NUMBER}. Bonyeza kitufe cha kijani kupiga.`
+            : `Your phone is opening ${EMERGENCY_NUMBER}. Press the green call button.`}{' '}
+          {/* Only promise the SMS once its button is really on the page. */}
+          {sms.length > 0
+            ? lang === 'sw'
+              ? 'SMS kwa CHP zimeandaliwa hapa chini.'
+              : 'SMS to your CHP is ready below.'
+            : lang === 'sw'
+              ? 'Neema inaandaa SMS kwa CHP wako.'
+              : 'Neema is getting the SMS for your CHP ready.'}
         </p>
       ) : null}
     </div>
@@ -146,12 +154,9 @@ export function AlertPage() {
           </p>
           <p className="soft-note" style={{ marginTop: '0.35rem' }}>
             {lang === 'sw'
-              ? 'Kuthibitisha si kuwasili — CHP au muuguzi hufunga kitanzi kwenye orodha ya ufuatiliaji.'
-              : 'Acknowledging is not arrival — a CHP or nurse closes the loop on the chase list.'}
+              ? 'Kuthibitisha si kuwasili. CHP au muuguzi ndiye anathibitisha amefika.'
+              : 'Confirming is not arrival. A CHP or nurse confirms when they arrive.'}
           </p>
-          <Button variant="secondary" style={{ width: '100%', marginTop: '0.65rem' }} onClick={() => nav('/chase')}>
-            {t('chase_cta')}
-          </Button>
         </div>
       ) : null}
 
@@ -298,6 +303,11 @@ export function AlertPage() {
             {lang === 'sw' ? 'Ongeza namba ya CHP' : 'Add a CHP number'}
           </Button>
         </div>
+      ) : isRed && !g.redAcknowledged ? (
+        // The SMS is built after the spoken message and the location check, which takes a few seconds.
+        <p className="soft-note sms-preparing" role="status" data-testid="sms-preparing">
+          {lang === 'sw' ? 'Neema inaandaa SMS kwa CHP wako…' : 'Getting the SMS for your CHP ready…'}
+        </p>
       ) : null}
 
       {isRed && !g.redAcknowledged && g.escalationDueInSec !== null ? (
@@ -356,11 +366,6 @@ export function AlertPage() {
         </div>
       ) : (
         <>
-          {isRed ? (
-            <Button variant="secondary" style={{ width: '100%', marginTop: '0.75rem' }} onClick={() => nav('/chase')}>
-              {t('chase_cta')}
-            </Button>
-          ) : null}
           <Button variant="ghost" style={{ width: '100%', marginTop: '0.75rem' }} onClick={() => nav('/home')}>
             {t('go_home')}
           </Button>

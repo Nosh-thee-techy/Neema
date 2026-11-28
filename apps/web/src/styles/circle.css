@@ -1,0 +1,77 @@
+.circle__kicker {
+  margin: 0.4rem 0 0;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8a5a32;
+}
+
+.circle-me,
+.circle-note {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.circle-me {
+  margin: 0.6rem 0 1rem;
+  padding: 0.8rem;
+  border-radius: 18px;
+  background: #fff6ea;
+  border: 1px solid #ead7c2;
+}
+
+.circle-me span,
+.circle-note em {
+  display: block;
+  font-style: normal;
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+}
+
+.circle-bird {
+  width: 48px;
+  height: 48px;
+  flex: none;
+}
+
+.circle-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.circle-note {
+  padding: 0.85rem;
+  border-radius: 18px;
+  background: var(--glass-strong, #fffdf8);
+  border: 1px solid var(--line, #eadfce);
+}
+
+.circle-note[data-mine='true'] {
+  background: #f3e7d6;
+}
+
+.circle-note p {
+  margin: 0.25rem 0 0;
+  line-height: 1.45;
+}
+
+.circle-compose {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 1rem;
+}
+
+.circle-compose textarea {
+  width: 100%;
+  border-radius: 16px;
+  border: 1px solid var(--line, #eadfce);
+  padding: 0.75rem 0.85rem;
+  font: inherit;
+  background: #fffdf8;
+  resize: vertical;
+}
