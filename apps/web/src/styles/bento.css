@@ -405,3 +405,51 @@ button.kpi-tile:focus-visible {
     grid-template-columns: 1fr;
   }
 }
+
+/*
+ * Connected band: the night card is the hero. The band sits beside it as a
+ * narrow tile, and the four gauges get a full row instead of a squeezed column.
+ */
+@media (min-width: 768px) {
+  .bento--live .bento__main {
+    grid-template-columns: 220px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .bento--live .band-hero {
+    min-height: 220px;
+    height: auto;
+    padding: 0.85rem;
+  }
+
+  .bento--live .band-hero__art {
+    width: min(170px, 100%);
+  }
+
+  .bento--live .bento__side {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .bento--live .bento__side .ring-row {
+    margin: 0;
+  }
+
+  .bento--live .bento__side .btn {
+    width: auto;
+    min-width: 11rem;
+  }
+}
+
+@media (min-width: 1100px) {
+  .bento--live {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'kpis'
+      'main'
+      'side'
+      'trend'
+      'checks';
+  }
+}

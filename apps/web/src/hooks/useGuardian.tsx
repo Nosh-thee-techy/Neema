@@ -26,9 +26,10 @@ import {
 import { getMessageText } from '../services/speech';
 import { createSimulatorBand, isSimulatorBand } from '../services/simulatorBand';
 import { createWebBluetoothBand } from '../services/webBluetoothBand';
+import { createReadingsBand } from '../services/readingsBand';
 import { createVitalsPipeline } from '../services/vitalsPipeline';
 import { runTriage } from '../services/triageRunner';
-import { applyBandFeedback } from '../services/bandFeedback';
+import { applyBandFeedback, nudgeIfCheckDue } from '../services/bandFeedback';
 import type { BandSource } from '../services/bandSource';
 import {
   createRecheckLoop,
@@ -49,12 +50,14 @@ import { tickFollowUps } from '../services/followUp';
 import { contactReadiness } from '../services/contacts';
 import { startEscalation } from '../services/escalation';
 import { soundAlarm } from '../services/alarm';
+import { watchPlanFor } from '../services/watchPlan';
+import { progressFromProfile } from '../services/pregnancyProgress';
 import { loadProfile } from '../services/passport';
 import { resetDemoData, seedDemoStep, type DemoStep } from '../services/demoPlayer';
 import type { EscalationHandle } from '../services/escalation';
 import { db } from '../storage/db';
 
-export type BandMode = 'simulator' | 'bluetooth';
+export type BandMode = 'simulator' | 'bluetooth' | 'live';
 
 /** One prefilled SMS the mother can open (a web app cannot send silently). */
 export interface PendingSms {
@@ -142,6 +145,8 @@ interface GuardianState {
   recheck: RecheckState;
   recheckDueInSec: number | null;
   connectSimulator: () => Promise<void>;
+  /** Pull the band's Wi-Fi readings. Does not open a Bluetooth pair sheet. */
+  connectLive: () => Promise<void>;
   connectBluetooth: () => Promise<void>;
   disconnect: () => Promise<void>;
   saveBp: (systolic: number, diastolic: number) => Promise<TriageResult | null>;
@@ -356,17 +361,27 @@ export function GuardianProvider({ children }: { children: ReactNode }) {
         const override = stageOverrideRef.current;
         const profile = override ? null : await loadProfile().catch(() => null);
         const activeStage: Stage = override?.stage ?? profile?.stage ?? 'pregnancy';
-        const weeks = override ? override.gestationWeeks : profile?.gestationWeeks;
+        const weeks = override
+          ? override.gestationWeeks
+          : (progressFromProfile(profile)?.weeks ?? profile?.gestationWeeks);
         setStage(activeStage);
+        // Her watch plan: stricter settings from her own history (none in demo or when locked).
+        const plan = watchPlanFor(override ? null : profile);
         const result = await runTriage({
           stage: activeStage,
           ...(activeStage === 'pregnancy' && weeks !== undefined ? { gestationWeeks: weeks } : {}),
           sosActive: sos,
           markedResting: true,
           timeZone: 'Africa/Nairobi',
+          config: plan.config,
         });
         setTriage(result);
         await handleLevelTransition(result);
+        // A check her plan asks for (e.g. blood pressure) is due: one gentle buzz a day.
+        if (plan.bpEveryDays !== null && result.level !== 'RED') {
+          const lastBp = await db.bp.orderBy('tsMs').last().catch(() => undefined);
+          await nudgeIfCheckDue(bandRef.current, plan, lastBp?.tsMs ?? null).catch(() => false);
+        }
         return result;
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -488,19 +503,53 @@ export function GuardianProvider({ children }: { children: ReactNode }) {
     return () => window.clearInterval(id);
   }, []);
 
+  useEffect(() => {
+    if (loadSavedDemo()) return;
+    let cancel = false;
+    void (async () => {
+      try {
+        const probe = await fetch('/api/readings');
+        if (cancel || probe.status === 503 || !probe.ok) return;
+        await bandRef.current.disconnect().catch(() => undefined);
+        const band = createReadingsBand();
+        bindBand(band);
+        await band.connect();
+        if (cancel) {
+          await band.disconnect();
+          return;
+        }
+        setBandMode('live');
+        setConnected(true);
+      } catch {
+        /* Leave the page as it is until the readings endpoint answers. */
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [bindBand]);
+
   const connectBand = useCallback(
     async (mode: BandMode) => {
       setLoading(true);
       setError(null);
       try {
         await bandRef.current.disconnect().catch(() => undefined);
-        const next = mode === 'bluetooth' ? createWebBluetoothBand() : createSimulatorBand(1);
+        const next =
+          mode === 'live'
+            ? createReadingsBand()
+            : mode === 'bluetooth'
+              ? createWebBluetoothBand()
+              : createSimulatorBand(1);
         bindBand(next);
         await next.connect();
         setBandMode(mode);
         setConnected(true);
       } catch (err) {
-        if (mode === 'bluetooth') {
+        if (mode === 'live') {
+          setConnected(false);
+          setError(err instanceof Error ? err.message : 'The band readings could not be reached.');
+        } else if (mode === 'bluetooth') {
           try {
             const sim = createSimulatorBand(1);
             bindBand(sim);
@@ -559,6 +608,7 @@ export function GuardianProvider({ children }: { children: ReactNode }) {
       recheck,
       recheckDueInSec,
       connectSimulator: () => connectBand('simulator'),
+      connectLive: () => connectBand('live'),
       connectBluetooth: () => connectBand('bluetooth'),
       async disconnect() {
         await bandRef.current.disconnect();

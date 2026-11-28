@@ -73,7 +73,7 @@ export function VitalsPage() {
       {!g.connected ? (
         <div className="band-connect">
           {/* Her real band is the main action. The practice band is named as practice. */}
-          <Button variant="primary" onClick={() => void g.connectBluetooth()}>
+          <Button variant="primary" onClick={() => void g.connectLive()}>
             {t('connect_band')}
           </Button>
           <Button variant="secondary" onClick={() => void g.connectSimulator()}>
@@ -87,7 +87,7 @@ export function VitalsPage() {
         </div>
       ) : null}
 
-      <div className="bento">
+      <div className={g.connected ? 'bento bento--live' : 'bento'}>
         <div className="bento__kpis" role="group" aria-label={lang === 'sw' ? 'Vipimo vya bendi' : 'Band readings'}>
           <KpiTile
             label={lang === 'sw' ? 'Mapigo' : 'Heart'}

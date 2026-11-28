@@ -51,8 +51,8 @@ const T = {
   splitB: c('Clear signal.', 'Ishara wazi.'),
   splitC: c('Safer nights.', 'Usiku salama zaidi.'),
   splitBody: c(
-    "The band sends a reading every second to her phone over Bluetooth. Neema compares it with her own normal, her blood pressure and the symptoms she reports, then says one thing: you're okay, check again soon, or go to a facility now.",
-    'Bendi inatuma kipimo kila sekunde kwa simu yake kupitia Bluetooth. Neema inakilinganisha na kawaida yake, shinikizo la damu na dalili anazoripoti, kisha inasema jambo moja: uko salama, pima tena hivi karibuni, au nenda kituo cha afya sasa.',
+    "The band sends a reading to Neema. Neema compares it with her own normal, her blood pressure and the symptoms she reports, then says one thing: you're okay, check again soon, or go to a facility now.",
+    'Bendi inatuma kipimo kwa Neema. Neema inakilinganisha na kawaida yake, shinikizo la damu na dalili anazoripoti, kisha inasema jambo moja: uko salama, pima tena hivi karibuni, au nenda kituo cha afya sasa.',
   ),
   snugT: c('Wear it snug', 'Ivae ikubane kidogo'),
   snugS: c(
