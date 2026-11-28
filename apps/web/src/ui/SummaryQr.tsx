@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 
-export function SummaryQr({ payload }: { payload: string }) {
+export function SummaryQr({ payload, label = 'Nurse summary QR code' }: { payload: string; label?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [failed, setFailed] = useState(false);
 
@@ -40,7 +40,7 @@ export function SummaryQr({ payload }: { payload: string }) {
     <canvas
       ref={canvasRef}
       className="qr-canvas"
-      aria-label="Nurse summary QR code"
+      aria-label={label}
     />
   );
 }

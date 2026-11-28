@@ -11,7 +11,8 @@ import { Segmented } from '../ui/Segmented';
 import { SYMPTOM_LABELS } from '../services/symptomLabels';
 import { SLEEP_TEXT } from '../ui/RecoveryParts';
 import { listClinicalNotes, type ClinicalNoteRow } from '../services/clinicalNotes';
-import { loadProfile } from '../services/passport';
+import { loadProfile, type MamaProfile } from '../services/passport';
+import { DoctorShare } from '../ui/DoctorShare';
 import { deliveryMsOf } from '../services/delivery';
 
 const CONFIG = getDefaultTriageConfig();
@@ -47,30 +48,42 @@ export function HistoryPage() {
   const [myNotes, setMyNotes] = useState<string>('');
   const [checkins, setCheckins] = useState<RecoveryCheckinRow[]>([]);
   const [birth, setBirth] = useState<{ ms: number; mode: string } | null>(null);
+  const [profile, setProfile] = useState<MamaProfile | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const [visitType, setVisitType] = useState<VisitRecord['type']>('antenatal');
   const [visitFacility, setVisitFacility] = useState('');
   const [visitDate, setVisitDate] = useState('');
 
   useEffect(() => {
+    let cancelled = false;
     void (async () => {
-      const [b, s, a, v, c, p] = await Promise.all([
-        db.bp.orderBy('tsMs').reverse().limit(60).toArray(),
-        db.symptoms.orderBy('tsMs').reverse().limit(40).toArray(),
-        db.alerts.orderBy('tsMs').reverse().limit(40).toArray(),
-        listVisits(),
-        listClinicalNotes(),
-        loadProfile().catch(() => null),
-      ]);
-      setBp(b);
-      setSymptoms(s);
-      setAlerts(a);
-      setVisits(v);
-      setClinical(c);
-      setMyNotes(p?.healthNotes ?? '');
-      setCheckins(await db.recoveryCheckins.orderBy('tsMs').reverse().limit(30).toArray());
-      const bms = deliveryMsOf(p);
-      setBirth(bms !== null && p?.delivery ? { ms: bms, mode: p.delivery.mode } : null);
+      try {
+        const [b, s, a, v, c, p] = await Promise.all([
+        db.bp.orderBy('tsMs').reverse().toArray(),
+        db.symptoms.orderBy('tsMs').reverse().toArray(),
+        db.alerts.orderBy('tsMs').reverse().toArray(),
+          listVisits(),
+          listClinicalNotes(),
+          loadProfile().catch(() => null),
+        ]);
+        if (cancelled) return;
+        setBp(b);
+        setSymptoms(s);
+        setAlerts(a);
+        setVisits(v);
+        setClinical(c);
+        setMyNotes(p?.healthNotes ?? '');
+        setProfile(p);
+        setCheckins(await db.recoveryCheckins.orderBy('tsMs').reverse().limit(30).toArray());
+        const bms = deliveryMsOf(p);
+        setBirth(bms !== null && p?.delivery ? { ms: bms, mode: p.delivery.mode } : null);
+      } finally {
+        if (!cancelled) setLoaded(true);
+      }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [g.triage?.level, g.activeAlertId]);
 
   const loc2 = sw ? 'sw-KE' : 'en-KE';
@@ -93,6 +106,10 @@ export function HistoryPage() {
     setVisitDate('');
   }
 
+  const shownBp = bp.slice(0, 60);
+  const shownSymptoms = symptoms.slice(0, 40);
+  const shownAlerts = alerts.slice(0, 40);
+
   const tabs: Array<[Tab, string]> = [
     ['readings', tx('Readings', 'Vipimo')],
     ['alerts', tx('Alerts', 'Tahadhari')],
@@ -104,6 +121,18 @@ export function HistoryPage() {
     <main className="screen hist">
       <h1 className="screen-title">{tx('Health history', 'Historia ya afya')}</h1>
       <p className="screen-sub">{tx('Everything saved on this phone, newest first.', 'Kila kitu kilichohifadhiwa kwenye simu hii, kipya kwanza.')}</p>
+
+      <DoctorShare
+        lang={lang}
+        ready={loaded}
+        profile={profile}
+        bp={bp}
+        symptoms={symptoms}
+        alerts={alerts}
+        visits={visits}
+        clinical={clinical}
+        level={g.triage?.level ?? 'UNKNOWN'}
+      />
 
       <Segmented
         mode="tabs"
@@ -117,7 +146,7 @@ export function HistoryPage() {
         options={tabs.map(([id, label]) => ({
           value: id,
           label,
-          dot: id === 'alerts' && alerts.some((a) => a.level === 'RED' && !a.acknowledgedAtMs),
+          dot: id === 'alerts' && shownAlerts.some((a) => a.level === 'RED' && !a.acknowledgedAtMs),
         }))}
       />
 
@@ -134,7 +163,7 @@ export function HistoryPage() {
               <p className="hist-empty">{tx('No blood pressure saved yet.', 'Bado hakuna shinikizo lililohifadhiwa.')}</p>
             ) : (
               <ul className="hist-list">
-                {bp.map((r) => {
+                {shownBp.map((r) => {
                   const f = bpFlag(r);
                   return (
                     <li key={r.id} data-tone={f.tone}>
@@ -195,7 +224,7 @@ export function HistoryPage() {
               <p className="hist-empty">{tx('None logged.', 'Hakuna.')}</p>
             ) : (
               <ul className="hist-list">
-                {symptoms.map((s) => (
+                {shownSymptoms.map((s) => (
                   <li key={s.id}>
                     <span className="hist-list__main">{s.codes.map((c) => (sw ? SYMPTOMS[c].sw : SYMPTOMS[c].en)).join(', ') || '—'}</span>
                     <span className="hist-list__time">{dt(s.tsMs)}</span>
@@ -215,7 +244,7 @@ export function HistoryPage() {
               <p className="hist-empty">{tx('No alerts so far.', 'Hakuna tahadhari hadi sasa.')}</p>
             ) : (
               <ul className="hist-list">
-                {alerts.map((a) => (
+                {shownAlerts.map((a) => (
                   <li key={a.id} data-tone={a.level === 'RED' ? 'alert' : 'watch'}>
                     <span className="hist-list__main">
                       <strong>{a.level === 'RED' ? tx('Urgent', 'Dharura') : tx('Warning', 'Onyo')}</strong>
@@ -234,7 +263,7 @@ export function HistoryPage() {
                 ))}
               </ul>
             )}
-            {alerts.some((a) => a.level === 'RED' && !a.acknowledgedAtMs) ? (
+            {shownAlerts.some((a) => a.level === 'RED' && !a.acknowledgedAtMs) ? (
               <button type="button" className="btn btn-primary" style={{ width: '100%', marginTop: '0.75rem' }} onClick={() => nav('/alert')}>
                 {tx('Open the current alert', 'Fungua tahadhari ya sasa')}
               </button>
