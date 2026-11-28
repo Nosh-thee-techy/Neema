@@ -14,7 +14,7 @@ import { LoadingScreen } from '../ui/LoadingScreen';
 import { EmergencyHoldButton } from '../ui/EmergencyHoldButton';
 import { BabyStageArt, NewbornArt } from '../ui/BabyStageArt';
 import { SLEEP_TEXT, recoveryDayText } from '../ui/RecoveryParts';
-import { IconBell, IconChat, IconChevron, IconHeart, IconMoon, IconPlus, IconPressure, IconSpark, IconTemp } from '../ui/icons';
+import { IconBell, IconChevron, IconHeart, IconMoon, IconPlus, IconPressure, IconSettings, IconSpark, IconTemp } from '../ui/icons';
 
 /** Thresholds come from the (placeholder, unsigned) triage config, never from this file. */
 const CONFIG = getDefaultTriageConfig();
@@ -125,7 +125,7 @@ export function HomePage() {
   if (nextSms && alertActive) {
     action = { label: t('open_sms'), href: nextSms.href, onClick: () => g.markSmsOpened(nextSms.contactId) };
   } else if (openLoops > 0 && (awaitingArrival || (level === 'RED' && g.redAcknowledged))) {
-    action = { label: t('chase_cta'), onClick: () => nav('/chase') };
+    action = { label: tx('See steps', 'Ona hatua'), onClick: () => nav('/alert') };
   } else if (level === 'RED') {
     action = { label: g.redAcknowledged ? tx('See steps', 'Ona hatua') : t('call_chp'), onClick: () => nav('/alert') };
   } else if (recheckDue || level === 'YELLOW') {
@@ -266,9 +266,14 @@ export function HomePage() {
         <button type="button" className="today-avatar" aria-label={tx('Settings', 'Mipangilio')} onClick={() => nav('/settings')}>
           {(name || 'M').charAt(0).toUpperCase()}
           {today.hasRealChp === false ? <span className="icon-btn__dot" aria-hidden /> : null}
+          {/* A cog on the corner, so the initial reads as "my settings", not decoration. */}
+          <span className="today-avatar__cog" aria-hidden>
+            <IconSettings />
+          </span>
         </button>
         <div className="today-top__mid">
-          <p className="today-top__date">{new Date(nowMs).toLocaleDateString(sw ? 'sw-KE' : 'en-KE', { day: 'numeric', month: 'long' })}</p>
+          {/* Short month: the full name pushed the date onto two lines beside the emergency button. */}
+          <p className="today-top__date">{new Date(nowMs).toLocaleDateString(sw ? 'sw-KE' : 'en-KE', { day: 'numeric', month: 'short' })}</p>
           <h1 className="home2__hello today-top__hello">
             {t(greetingKey(new Date(nowMs).getHours()))}, {name}
           </h1>
@@ -430,7 +435,7 @@ export function HomePage() {
               [tx('Baby growth', 'Ukuaji'), '/insights', <IconSpark key="i" />, true],
               [tx('Symptoms', 'Dalili'), '/symptoms', <IconPlus key="i" />, false],
               [tx('Blood pressure', 'Shinikizo'), '/bp', <IconPressure key="i" />, false],
-              [tx('Talk to Neema', 'Ongea'), '/care', <IconChat key="i" />, false],
+              [tx('Sleep', 'Usingizi'), '/wellbeing', <IconMoon key="i" />, false],
             ]
         ).map(([label, to, icon, main]) => (
           <button key={to as string} type="button" className="today-action" data-main={main as boolean} onClick={() => nav(to as string)}>
@@ -444,13 +449,18 @@ export function HomePage() {
       <section className="today-insights" aria-labelledby="insights-title">
         <div className="today-insights__head">
           <h2 id="insights-title">{tx('My daily insights', 'Maelezo yangu ya leo')}</h2>
-          <button type="button" className="n-link" onClick={() => nav('/insights')}>
-            {tx('See all', 'Ona yote')}
-          </button>
+          <span className="today-insights__links">
+            <button type="button" className="today-insights__arrow" aria-label={tx("Open today's story", 'Fungua hadithi ya leo')} onClick={() => nav('/story')}>
+              →
+            </button>
+            <button type="button" className="n-link" onClick={() => nav('/insights')}>
+              {tx('See all', 'Ona yote')}
+            </button>
+          </span>
         </div>
         <div className="today-cards" role="list" ref={cardsRef}>
           {cards.map((c) => (
-            <button key={c.id} type="button" role="listitem" className="today-card" data-tone={c.tone} onClick={() => nav(c.to)}>
+            <button key={c.id} type="button" role="listitem" className="today-card" data-tone={c.tone} onClick={() => nav('/story')}>
               <span className="today-card__kicker">{c.kicker}</span>
               <strong className="today-card__title">{c.title}</strong>
               <span className="today-card__text">{c.text}</span>
@@ -524,7 +534,8 @@ export function HomePage() {
         ) : null}
 
         <div className="reads__btns">
-          <button type="button" className="btn btn-primary" onClick={() => nav('/bp')}>
+          {/* Secondary on purpose: the daily check-in is the one main action on this screen. */}
+          <button type="button" className="btn btn-secondary" onClick={() => nav('/bp')}>
             {tx('Add blood pressure', 'Ongeza shinikizo')}
           </button>
           {!g.connected ? (
@@ -547,6 +558,16 @@ export function HomePage() {
           {tx('Neema does not diagnose. Alert levels are set by your health team.', 'Neema hatambui ugonjwa. Viwango vya hatari huwekwa na timu ya afya.')}
         </p>
       </section>
+
+      <button type="button" className="today-circle" onClick={() => nav('/circle')}>
+        <span className="today-circle__mark" aria-hidden>
+          ♡
+        </span>
+        <span>
+          <strong>{tx("Mothers' circle", 'Duara la mama')}</strong>
+          <small>{tx('Anonymous. A cartoon name, never yours.', 'Bila jina. Jina la katuni, si lako.')}</small>
+        </span>
+      </button>
 
       <p className="trust-line">{t('saved_here')}</p>
     </main>

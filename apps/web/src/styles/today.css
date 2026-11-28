@@ -58,6 +58,25 @@
   right: -2px;
 }
 
+.today-avatar__cog {
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 2px 6px rgba(18, 26, 44, 0.22);
+}
+
+.today-avatar__cog svg {
+  width: 14px;
+  height: 14px;
+}
+
 .today-top__mid {
   min-width: 0;
   text-align: center;
@@ -70,19 +89,40 @@
   color: var(--ink);
 }
 
+/* The greeting wraps to a second line; her name is never cut off with "…". */
 .today .today-top__hello {
   margin: 0;
   font-family: var(--font-ui);
   font-size: 0.82rem;
   font-weight: 600;
+  line-height: 1.2;
   color: #7a4a35;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
 }
 
+.today-top__date {
+  white-space: nowrap;
+}
+
+/* Compact pill so "Emergency" fits beside the date on a 360px phone. */
 .today .sos-hold {
   min-height: 46px;
+  gap: 0.4rem;
+  padding-right: 0.7rem;
+}
+
+.today .sos-hold__ring {
+  width: 36px;
+  height: 36px;
+}
+
+.today .sos-hold__text strong {
+  font-size: 0.8rem;
+}
+
+.today .sos-hold__text small {
+  font-size: 0.7rem;
 }
 
 /* Week strip */
@@ -347,16 +387,32 @@
   color: var(--ink);
 }
 
+.today-insights__links {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.today-insights__arrow {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: #fffdf8;
+  color: var(--ink);
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
 .today-cards {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: 158px;
+  grid-auto-columns: 100%;
   gap: 0.7rem;
-  margin: 0.6rem -1.1rem 0;
-  padding: 0.3rem 1.1rem 0.6rem;
+  margin: 0.6rem 0 0;
+  padding: 0.15rem 0 0.5rem;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
-  scroll-padding-inline: 1.1rem;
   scrollbar-width: none;
 }
 
@@ -368,9 +424,10 @@
   scroll-snap-align: start;
   display: grid;
   align-content: start;
-  gap: 0.35rem;
-  height: 196px;
-  padding: 0.85rem 0.8rem;
+  gap: 0.2rem;
+  min-height: 112px;
+  height: auto;
+  padding: 0.85rem 1rem;
   border-radius: 18px;
   border: 3px solid #f3a3b4;
   background: #fbd9c9;
@@ -404,7 +461,7 @@
   font-size: 0.82rem;
   line-height: 1.35;
   display: -webkit-box;
-  -webkit-line-clamp: 4;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -428,6 +485,44 @@
   background: #fbe0e3;
   border-color: #e88a99;
   color: #5a1220;
+}
+
+.today-circle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  margin-top: 0.9rem;
+  padding: 0.85rem 1rem;
+  border-radius: 18px;
+  border: 1px solid #e7d3be;
+  background: #fffaf3;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.today-circle strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}
+
+.today-circle small {
+  display: block;
+  color: var(--ink-muted);
+  font-size: 0.82rem;
+}
+
+.today-circle__mark {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #f3d7c4;
+  color: #8a4b32;
+  font-size: 1.1rem;
 }
 
 .today-card[data-tone='navy'] {
